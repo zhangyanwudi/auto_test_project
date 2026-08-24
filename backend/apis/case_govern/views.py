@@ -19,9 +19,9 @@ logger = logging.getLogger('apis.case_govern')
 
 NODE_TYPES = ('module', 'case', 'step', 'expect', 'precondition')
 PRIORITY_MAP = {1: '高', 2: '中', 3: '低'}
-# 导入 .emmx 时按层级映射节点类型：0-根主题(模块)，其余层级统一映射为用例
-EMMX_DEPTH_TYPE = {0: 'module'}
-# 导入 .emmx 时用例归属模块（文件不含模块信息，归入「其它」）
+# 导入 .emmx / .xmind 时按层级映射节点类型：0-根主题(模块)，其余层级统一映射为用例
+IMPORT_DEPTH_TYPE = {0: 'module'}
+# 导入 .emmx / .xmind 时用例归属模块（文件不含模块信息，归入「其它」）
 IMPORT_DEFAULT_MODULE = '其它'
 
 
@@ -351,13 +351,130 @@ def _parse_emmx(raw_bytes):
     return topics, root
 
 
-def _emmx_to_tree(topics, root):
-    """将 .emmx 主题扁平表转成思维导图树，按层级映射节点类型。"""
+def _xmind_local(tag):
+    """去掉 XML 命名空间前缀，返回本地标签名。"""
+    return tag.rsplit('}', 1)[-1]
+
+
+def _parse_xmind_xml(xml_bytes):
+    """解析 .xmind 旧版格式（content.xml），返回 (topics, root)。"""
+    try:
+        root_el = ET.fromstring(xml_bytes)
+    except ET.ParseError as e:
+        raise ValueError('思维导图 XML 解析失败：%s' % e)
+
+    for sheet in root_el.iter():
+        if _xmind_local(sheet.tag) != 'sheet':
+            continue
+        root_topic_el = next((c for c in sheet if _xmind_local(c.tag) == 'topic'), None)
+        if root_topic_el is None:
+            continue
+
+        topics = {}
+
+        def add(topic_el):
+            tid = topic_el.get('id') or ''
+            if not tid:
+                return
+            title_el = next((c for c in topic_el if _xmind_local(c.tag) == 'title'), None)
+            text = re.sub(r'\s+', ' ', ''.join(title_el.itertext())) if title_el is not None else ''
+            topics[tid] = {'id': tid, 'text': text.strip(), 'subs': []}
+
+        for topic_el in sheet.iter():
+            if _xmind_local(topic_el.tag) == 'topic':
+                add(topic_el)
+
+        for topic_el in sheet.iter():
+            if _xmind_local(topic_el.tag) != 'topic':
+                continue
+            tid = topic_el.get('id')
+            if not tid or tid not in topics:
+                continue
+            subs = []
+            for children_el in topic_el:
+                if _xmind_local(children_el.tag) != 'children':
+                    continue
+                for topics_el in children_el:
+                    if _xmind_local(topics_el.tag) != 'topics':
+                        continue
+                    for sub_el in topics_el:
+                        if _xmind_local(sub_el.tag) == 'topic' and sub_el.get('id') in topics:
+                            subs.append(sub_el.get('id'))
+            topics[tid]['subs'] = subs
+
+        root = topics.get(root_topic_el.get('id'))
+        if root:
+            return topics, root
+    raise ValueError('未找到思维导图根主题（sheet/topic）')
+
+
+def _parse_xmind_json(json_bytes):
+    """解析 .xmind 新版格式（content.json），返回 (topics, root)。"""
+    try:
+        data = json.loads(json_bytes.decode('utf-8'))
+    except Exception as e:
+        raise ValueError('思维导图 JSON 解析失败：%s' % e)
+
+    sheets = [data] if isinstance(data, dict) else (data if isinstance(data, list) else [])
+
+    def json_children(t):
+        children = t.get('children') if isinstance(t, dict) else None
+        result = []
+        if isinstance(children, dict):
+            for group in children.values():
+                if isinstance(group, list):
+                    result.extend(group)
+        elif isinstance(children, list):
+            result.extend(children)
+        return result
+
+    topics = {}
+
+    def collect(t):
+        if not isinstance(t, dict):
+            return None
+        tid = t.get('id') or ''
+        title = t.get('title') or ''
+        if isinstance(title, dict):
+            title = title.get('text') or ''
+        text = re.sub(r'\s+', ' ', str(title)).strip()
+        topics[tid] = {'id': tid, 'text': text, 'subs': []}
+        for child in json_children(t):
+            cid = collect(child)
+            if cid and cid in topics:
+                topics[tid]['subs'].append(cid)
+        return tid
+
+    for sheet in sheets:
+        if not isinstance(sheet, dict):
+            continue
+        root_topic = sheet.get('rootTopic')
+        if not isinstance(root_topic, dict):
+            continue
+        root_id = collect(root_topic)
+        if root_id and root_id in topics:
+            return topics, topics[root_id]
+    raise ValueError('未找到思维导图根主题（sheet/rootTopic）')
+
+
+def _parse_xmind(raw_bytes):
+    """解析 .xmind 文件（ZIP 内含 content.json 或 content.xml），返回 (topics, root)。"""
+    with zipfile.ZipFile(io.BytesIO(raw_bytes)) as zf:
+        names = {n.lower(): n for n in zf.namelist()}
+        if 'content.json' in names:
+            return _parse_xmind_json(zf.read(names['content.json']))
+        if 'content.xml' in names:
+            return _parse_xmind_xml(zf.read(names['content.xml']))
+    raise ValueError('未找到思维导图内容（content.json/content.xml）')
+
+
+def _topics_to_tree(topics, root):
+    """将思维导图主题扁平表转成思维导图树，按层级映射节点类型。"""
     def build(tid, depth):
         t = topics[tid]
         return {
             'title': t['text'] or '未命名',
-            'node_type': EMMX_DEPTH_TYPE.get(depth, 'case'),
+            'node_type': IMPORT_DEPTH_TYPE.get(depth, 'case'),
             'is_smoke': False,
             'exec_result': '',
             'image': '',
@@ -370,25 +487,28 @@ def _emmx_to_tree(topics, root):
 @csrf_exempt
 @require_http_methods(['POST'])
 @require_valid_token
-def case_import_emmx(request):
-    """导入 MindMaster（.emmx）思维导图：解析主题树并创建用例及节点。"""
+def case_import(request):
+    """导入思维导图（.emmx / .xmind）：根据文件扩展名自动区分解析方式并创建用例及节点。"""
     uploaded = request.FILES.get('file')
     if not uploaded:
         return JsonResponse({'code': 400, 'message': '未检测到上传文件'}, status=400)
-    if not (uploaded.name or '').lower().endswith('.emmx'):
-        return JsonResponse({'code': 400, 'message': '仅支持 .emmx 思维导图文件'}, status=400)
+    name = uploaded.name or ''
+    ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+    parser = {'xmind': _parse_xmind, 'emmx': _parse_emmx}.get(ext)
+    if parser is None:
+        return JsonResponse({'code': 400, 'message': '仅支持 .emmx / .xmind 思维导图文件'}, status=400)
 
     try:
-        topics, root = _parse_emmx(uploaded.read())
+        topics, root = parser(uploaded.read())
     except zipfile.BadZipFile:
-        return JsonResponse({'code': 400, 'message': '不是有效的 .emmx 文件（ZIP 解压失败）'}, status=400)
+        return JsonResponse({'code': 400, 'message': '不是有效的 .%s 文件（ZIP 解压失败）' % ext}, status=400)
     except ValueError as e:
         return JsonResponse({'code': 400, 'message': '解析失败：%s' % e}, status=400)
     except Exception as e:
-        logger.exception('导入 emmx 失败: %s', uploaded.name)
+        logger.exception('导入 %s 失败: %s', ext, name)
         return JsonResponse({'code': 500, 'message': '导入失败：%s' % e}, status=500)
 
-    fallback_name = uploaded.name.rsplit('.', 1)[0] if '.' in uploaded.name else uploaded.name
+    fallback_name = name.rsplit('.', 1)[0] if '.' in name else name
     case_name = root['text'] or fallback_name
     module = IMPORT_DEFAULT_MODULE
     if ZCaseGovernCase.objects.filter(case_name=case_name, module=module).exists():
@@ -397,7 +517,7 @@ def case_import_emmx(request):
             status=400,
         )
 
-    tree = _emmx_to_tree(topics, root)
+    tree = _topics_to_tree(topics, root)
     with transaction.atomic():
         c = ZCaseGovernCase.objects.create(
             case_name=case_name,
@@ -413,3 +533,7 @@ def case_import_emmx(request):
     _ensure_module(module)
     node_count = ZCaseGovernCaseNode.objects.filter(case_id=c.id).count()
     return JsonResponse({'code': 0, 'message': '导入成功', 'data': _serialize_case(c, node_count)})
+
+
+# 兼容旧接口名（.emmx 导入入口），与新统一入口行为一致
+case_import_emmx = case_import

@@ -11,7 +11,13 @@
         </span>
         <el-button size="small" @click="expandAll">展开全部</el-button>
         <el-button size="small" @click="collapseAll">收起全部</el-button>
-        <el-button size="small" type="primary" :loading="saving" @click="onSave">保存</el-button>
+        <el-button
+          size="small"
+          :disabled="!canUndoDelete"
+          title="撤销最近一次删除（Ctrl+Z / ⌘Z）"
+          @click="undoDelete"
+        >撤销删除</el-button>
+        <el-button size="small" type="primary" :loading="saving" @click="onSave()">保存</el-button>
       </div>
     </div>
 
@@ -121,7 +127,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, provide, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bottom, Delete } from '@element-plus/icons-vue'
 import { fetchMindTree, saveMindTree } from '../../api/case_govern/caseGovern.js'
 import MindNode from './MindNode.vue'
@@ -157,6 +163,9 @@ const editSnapshot = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
+// 保存前已删除的节点记录（用于「撤销删除」恢复），保存成功后清空
+const deletedStack = ref([])
+const canUndoDelete = computed(() => deletedStack.value.length > 0)
 const links = ref([])
 const contentRef = ref(null)
 const nodeEls = {}
@@ -265,10 +274,37 @@ function addSibling(id) {
   notify()
 }
 
-function removeNode(id) {
+async function removeNode(id) {
   if (id === tree.id) return
+  const node = findNode(tree, id)
+  if (!node) return
   const parent = findParent(tree, id)
   if (!parent) return
+  const idx = parent.children.findIndex((c) => c.id === id)
+  if (idx === -1) return
+  const title = node.title || '未命名'
+  const hasChildren = (node.children || []).length > 0
+  const hint = hasChildren ? '（含其全部子节点）' : ''
+  try {
+    await ElMessageBox.confirm(
+      `确定删除节点「${title}」${hint}吗？删除后可通过「撤销删除」恢复。`,
+      '删除节点',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+      },
+    )
+  } catch {
+    return // 用户取消
+  }
+  // 记录删除位置与完整子树，保存前可撤销恢复
+  deletedStack.value.push({
+    node: JSON.parse(JSON.stringify(node)),
+    parentId: parent.id,
+    index: idx,
+  })
   parent.children = parent.children.filter((c) => c.id !== id)
   selectedId.value = parent.id
   if (editingId.value === id) {
@@ -276,6 +312,21 @@ function removeNode(id) {
   }
   markDirty()
   notify()
+  ElMessage.success(`已删除节点「${title}」，可点击「撤销删除」恢复`)
+}
+
+function undoDelete() {
+  const record = deletedStack.value.pop()
+  if (!record) return
+  const parent = findParent(tree, record.parentId)
+  if (!parent) return
+  const idx = Math.min(record.index, parent.children.length)
+  parent.children.splice(idx, 0, record.node)
+  selectedId.value = record.node.id
+  editingId.value = null
+  markDirty()
+  notify()
+  ElMessage.success('已撤销删除')
 }
 
 function toggleCollapse(id) {
@@ -428,10 +479,11 @@ async function onSave(silent = false) {
   try {
     const res = await saveMindTree(props.caseId, serializeNode(tree))
     if (res.code === 0) {
-      if (!silent) {
+      if (silent !== true) {
         ElMessage.success(res.message || '已保存')
       }
       dirty.value = false
+      deletedStack.value = []
       emit('dirty-change', false)
       emit('saved')
     } else {
@@ -459,6 +511,14 @@ function onGlobalKeydown(e) {
     if (selectedId.value != null) {
       e.preventDefault()
       edit(selectedId.value)
+    }
+    return
+  }
+  // Ctrl+Z / Cmd+Z：撤销最近一次删除
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    if (deletedStack.value.length) {
+      e.preventDefault()
+      undoDelete()
     }
     return
   }

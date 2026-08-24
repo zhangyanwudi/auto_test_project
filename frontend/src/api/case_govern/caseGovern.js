@@ -52,11 +52,11 @@ export async function saveMindTree(id, tree) {
   return res.json()
 }
 
-/** 导入 MindMaster（.emmx）思维导图，创建用例及节点 */
-export async function importCaseFromEmmx(file) {
+/** 导入思维导图（.emmx / .xmind），后端按扩展名自动区分解析方式 */
+export async function importCaseFromFile(file) {
   const form = new FormData()
   form.append('file', file)
-  const res = await requestWithToken(`${BASE}/cases/import_emmx/`, {
+  const res = await requestWithToken(`${BASE}/cases/import/`, {
     method: 'POST',
     body: form,
   })

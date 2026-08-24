@@ -13,7 +13,7 @@
       <el-empty v-if="showEmptyHint" description="暂无用例" :image-size="72">
         <el-button type="primary" @click="openCreateDialog">新建用例</el-button>
         <el-button :loading="importing" @click="triggerImport">导入用例</el-button>
-        <p class="empty-sub">列表将展示已创建的用例；也可导入 .emmx 思维导图。</p>
+        <p class="empty-sub">列表将展示已创建的用例；也可导入 .emmx / .xmind 思维导图。</p>
       </el-empty>
 
       <template v-else>
@@ -75,7 +75,7 @@
     <input
       ref="importInput"
       type="file"
-      accept=".emmx"
+      accept=".emmx,.xmind"
       style="display: none"
       @change="onImportFileChange"
     />
@@ -176,7 +176,7 @@ import {
   createCase,
   updateCase,
   deleteCase,
-  importCaseFromEmmx,
+  importCaseFromFile,
 } from '../../api/case_govern/caseGovern.js'
 import MindMapEditor from './MindMapEditor.vue'
 
@@ -481,7 +481,7 @@ async function onImportFileChange(e) {
   if (!file) return
   importing.value = true
   try {
-    const res = await importCaseFromEmmx(file)
+    const res = await importCaseFromFile(file)
     if (res.code === 0) {
       ElMessage.success(res.message || '导入成功')
       await loadList()
