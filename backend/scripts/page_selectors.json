@@ -1,0 +1,13 @@
+{
+  "_comment": "配置比对页面的 CSS 选择器配置 - 根据前端实际页面结构调整",
+  "project_select": "#project-select, [data-testid='project-select'], .project-dropdown select",
+  "project_option": "option, .el-select-dropdown__item, [role='option']",
+  "left_search_input": "#left-search-input, [data-testid='left-search'], .left-panel .search-input input",
+  "left_search_results": ".left-panel .search-results, [data-testid='left-results']",
+  "left_json_area": "#left-json-viewer, [data-testid='left-json'], .left-panel .json-content",
+  "right_search_input": "#right-search-input, [data-testid='right-search'], .right-panel .search-input input",
+  "right_search_results": ".right-panel .search-results, [data-testid='right-results']",
+  "right_json_area": "#right-json-viewer, [data-testid='right-json'], .right-panel .json-content",
+  "loading_indicator": ".loading-spinner, .el-loading-mask, [data-testid='loading']",
+  "error_message": ".error-message, .el-message--error, [data-testid='error']"
+}

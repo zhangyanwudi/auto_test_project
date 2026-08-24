@@ -1,0 +1,27 @@
+{
+    "server_host": "10.254.57.95",
+    "server_port": 22,
+    "username": "zhangyan",
+    "password": "zhangyan",
+    "private_key_path": null,
+    "remote_upload_dir": "/Users/admin/Desktop/ZnYan/tmp",
+    "remote_project_dir": "/Users/admin/Desktop/ZnYan/auto_test_project",
+    "zip_filename": "deploy_package.zip",
+    "max_file_size_mb": 100,
+    "pack_timeout": 120,
+    "exclude_patterns": [
+        "__pycache__",
+        "*.pyc",
+        "*.pyo",
+        ".git",
+        ".gitignore",
+        ".idea",
+        ".vscode",
+        "*.log",
+        ".env",
+        "venv",
+        ".venv",
+        "one_deploy.py",
+        "config.json"
+    ]
+}

@@ -1,0 +1,14 @@
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.idea/
+.DS_Store
+*.pid
+.pids/
+.claude/
+frontend/dist/
+.env
+logs/
+backend/config/page_config.json

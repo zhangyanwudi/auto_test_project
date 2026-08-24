@@ -1,0 +1,18 @@
+{
+    "ad_unit_1": {
+        "reload": {
+            "reload_action": "new_load_reset",
+            "reload_count": 10,
+            "reload_logic": {
+                "retry_intervals": [2000, 3000, 4000]
+            },
+            "reload_type": 4
+        }
+    },
+    "ad_unit_2": {
+        "reload": {
+            "reload_action": "new_load_reset",
+            "reload_count": 5
+        }
+    }
+}

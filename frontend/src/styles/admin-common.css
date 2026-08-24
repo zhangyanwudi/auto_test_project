@@ -1,0 +1,12 @@
+/* 管理后台：表格行内操作按钮组 */
+.table-ops {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.table-ops .el-button + .el-button {
+  margin-left: 0;
+}

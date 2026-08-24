@@ -1,0 +1,7892 @@
+## Sheet: Sheet1
+					BlockBlast Android 181批测试方案（共个方案）冷启动即参与流量分配 AB						
+											
+原始方案编号	广告类型	方案概述	abtest	技术	方案细节	状态	发起人	备注	上线地区	数据依据	
+fs234601		【底板】fs8208603
+
+【插屏】7.7晋升fs208603
+（原始208603）【插屏】fs8311699+Pangle 聚合直连（保留原底板pangle直连逻辑）			【插屏】fs8311699+Pangle 聚合直连（保留原底板pangle直连逻辑）
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		王欣	【底板】
+
+【插屏】
+
+高价_全球_BlockBlast_GP_FS_83015_high_插屏1：64c4666041a83eae
+
+兜底_全球_BlockBlast_GP_FS_83015_bidding_插屏2：f6b29a77873c0b5e
+
+中价_全球_BlockBlast_GP_FS_83015_Mid_插屏3：cbc4d54104b4c63f
+
+
+【直连】
+Pangle 聚合
+appid：8074677
+pangle插屏1：983216802
+bigo
+appid：10683192
+bigo插屏：10683192-11366253
+Pangle 
+appid：8757593
+pangle插屏：981690058
+adx
+插屏-兜底ID1：1570
+插屏-中价ID2：1571
+插屏-高价ID3：1572			
+fs234602		底板			底板		刘大龙,蒋树林	【底板】			
+fs234603		底板			底板		刘大龙,蒋树林	【底板】			
+fs234604		【插屏】基于底板fs8208603+ 【春波 service_version:gp_ecpm_all_v234_imp_w3_role_1】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		刘春波	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234605		【插屏】基于底板fs8208603+ 【春波 service_version:gp_ecpm_all_v234_imp_w3_role_2】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		刘春波	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234606		【插屏】基于底板fs8208603+ 【春波 service_version:gp_ecpm_all_v234_imp_w3_role_3】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		刘春波	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234607		【插屏】基于底板fs8208603+ 【春波 service_version:gp_ecpm_all_v234_imp_w3_role_4】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		刘春波	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234608		【插屏】基于底板fs8208603 + 【树仑 service_version:gp_ecpm_all_v234_imp_1】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234609		【插屏】基于底板fs8208603 + 【树仑 service_version:gp_ecpm_all_v234_imp_2】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234610		【插屏】基于底板fs8208603 + 【树仑 service_version:gp_ecpm_all_v234_imp_3】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234611		【插屏】基于底板fs8208603 + 【树仑 service_version:gp_ecpm_all_v234_imp_4】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234612		【插屏】基于底板fs8208603 + 【梦静+树仑 service_version:gp_ecpm_all_v234_imp_6】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		宋梦静,袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234613		【插屏】基于底板fs8208603 + 【梦静+树仑 service_version:gp_ecpm_all_v234_imp_7】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		宋梦静,袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234614		【插屏】基于底板fs8208603 + 【梦静+树仑 service_version:gp_ecpm_all_v234_imp_8】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		宋梦静,袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234615		【插屏】基于底板fs8208603 + 【梦静+树仑 service_version:gp_ecpm_all_v234_imp_9】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	接口同春波
+同上		【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		宋梦静,袁树仑	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234616		【插屏】基于底板fs8208603 + 【小浩 service_version:gp_ecpm_all_234_bid_orig_fs_ecpm_1】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参	"""基于最新底板
+""""正式接口：https://block-algo-online.afafb.com/infer/v1/block_zhangxiaohao_models_comm
+"""	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		张小浩	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234617		【插屏】基于底板fs8208603 + 【小浩 service_version:gp_ecpm_all_234_bid_orig_fs_ecpm_2】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参	"""基于最新底板
+""""正式接口：https://block-algo-online.afafb.com/infer/v1/block_zhangxiaohao_models_comm
+"""	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		张小浩	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234618		【插屏】基于底板fs8208603 + 【小浩 service_version:gp_ecpm_all_234_bid_orig_fs_ecpm_3】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参	"""基于最新底板
+""""正式接口：https://block-algo-online.afafb.com/infer/v1/block_zhangxiaohao_models_comm
+"""	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		张小浩	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234619		【插屏】基于底板fs8208603 + 【小浩 service_version:gp_ecpm_all_234_bid_orig_fs_ecpm_4】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	调参	"""基于最新底板
+""""正式接口：https://block-algo-online.afafb.com/infer/v1/block_zhangxiaohao_models_comm
+"""	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		张小浩	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234620		【插屏】基于最新底板fs8208603+ 【周亮 service_version:gp_ecpm_gbm_zl_fs234_1】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-zl.afafb.com/infer/v1/block_floor_predict
+	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		周亮	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234621		【插屏】基于最新底板fs8208603+ 【周亮 service_version:gp_ecpm_gbm_zl_fs234_2】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-zl.afafb.com/infer/v1/block_floor_predict
+	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		周亮	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234622		【插屏】基于最新底板fs8208603+ 【周亮 service_version:gp_ecpm_gbm_zl_fs234_3】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-zl.afafb.com/infer/v1/block_floor_predict
+	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		周亮	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234623		【插屏】基于最新底板fs8208603+ 【周亮 service_version:gp_ecpm_gbm_zl_fs234_4】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-zl.afafb.com/infer/v1/block_floor_predict
+	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		周亮	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234624		【插屏】基于最新底板fs8208603+ 【周亮 service_version:gp_ecpm_gbm_zl_fs234_8】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-zl.afafb.com/infer/v1/block_floor_predict
+	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		周亮	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234625		【插屏】基于最新底板fs8208603+ 【周亮 service_version:gp_ecpm_gbm_zl_fs234_9】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-zl.afafb.com/infer/v1/block_floor_predict
+	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		周亮	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234624		【插屏】基于最新底板fs8208603+ 【陈威 service_version: gp_ecpm_pred_surv_func_v1_newfeat_1】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-cw.afafb.com/infer/v1/ecpm_chenwei
+延时(ms): min=351  avg=454  p50=407  p90=520  p99=1478  max=5976	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		陈威	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234625		【插屏】基于最新底板fs8208603+ 【陈威 service_version: gp_ecpm_pred_surv_func_v1_newfeat_3】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-cw.afafb.com/infer/v1/ecpm_chenwei
+延时(ms): min=351  avg=454  p50=407  p90=520  p99=1478  max=5976	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		陈威	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234626		【插屏】基于最新底板fs8208603+ 【陈威 service_version: gp_ecpm_pred_surv_func_v1_newfeat_4】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-cw.afafb.com/infer/v1/ecpm_chenwei
+延时(ms): min=351  avg=454  p50=407  p90=520  p99=1478  max=5976	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		陈威	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+fs234627		【插屏】基于最新底板fs8208603+ 【陈威 service_version: gp_ecpm_pred_surv_func_v1_newfeat_5】
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板	开发	"""基于最新底板
+""""正式接口：https://ai-server-commerce-cw.afafb.com/infer/v1/ecpm_chenwei
+延时(ms): min=351  avg=454  p50=407  p90=520  p99=1478  max=5976	【插屏】fs8311699 + 基于模型返回ecpm与重试次数
+Pangle聚合逻辑（仅初始化支持的国家）：
+每次冷启动同时初始化MAX/BIGO/ADX/ PANGLE聚合 SDK，初始化成功后各自load自己的ID，展示时比价 (如果只有一个缓存ready则先到先得)+自动补位
+【unit设置】Pangle 聚合：1插屏ID
+
+ADX直连逻辑：
+【加载逻辑】: sdk初始化后每次先load无底价adunit1，返回结果（成功/失败）后，再同时load中价adunit2和高价ad unit3（设置corridor地板价格）
+【补位机制】placement关闭后进行补位，根据底价设置逻辑进行；  每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【重试机制】
+adx adunit 1&2&3: 重试5次，重试间隔：2的幂次方
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+【底价设置】
+ID3高价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *2.0
+ID2中价：corridor地板价格=Max(上次展示ecpm , adx ID1load的ecpm) *1.3
+ID1底价：corridor地板价格=上次展示ecpm *0.8（若带corridor地板价的load 2次重试后无填充，则下次load立即恢复为无地板价；当ID1 load成功后刷新此规则）（若无上次展示ecpm则unit1不设置地板价）
+【PS】
+1. 上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session不重置。上次展示ecpm包含该广告类型的所有ID。上次展示ecpm 包含任何渠道的展示
+2. adx ID1 load的ecpm逻辑：
+如果adx ID1 load成功，取load回来的ecpm价格；如果adx ID1 load失败，adx ID1 ecpm记为0。
+adx ID1 load的ecpm跨session跨天不保留。
+【底价更新】
+-  当ID2/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID2的N=1，ID3的N=1）
+
+ ID3:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID2:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID2和ID3分开计数；）
+
+Max&其他直连逻辑：
+「0-7」「7-31」
+【插屏】（原始方案fs160612）基于151608+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，最多10次/ID2: 2s固定间隔,最多5次/ID3首次load（1-2-3-4-5……10s）时间间隔最多10次/ID3非首次load等差递增最多8次
+加载设置:
+【Load逻辑】
+每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+【直连】
+0-7:
+Pangle client直连：日韩台（插屏）；低ecpm 13国家（插屏&激励）
+Bigo  client直连：低ecpm 13国家&5国家（插屏&激励）；俄罗斯（插屏）
+7-31:
+pangle client直连：日韩台（插屏），低ecpm 13国家（插屏&激励）
+31+：
+adx sdk直连：
+俄罗斯 （插屏&激励）
+pangle client直连：日韩台（插屏）
+，低ecpm13国家（插屏&激励）
+
+bigo client直连：加澳（插屏）
+
+
+MAX聚合广告单元设置:
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+【重试逻辑】auto retry：
+0-7：adunit 1，2，3均禁用
+7-31：adunit1,2,3 均禁用
+31+：adunit1,3 均禁用，adunit2不禁用
+
+【用户分层】每次session初始化，取上次session的平均ecpm值（仅取上一次），判断用户的价值属性
+高价值用户：[50,+∞)
+中价值用户：[5,50)
+低价值用户：[0,5)
+
+客户端设置:
+【segment】无
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+ID1：(2-4-6-8-10-2-4-6-8-10s) 间隔进行重试，针对本次load 最多10次；
+ID2: 2s固定间隔，针对本次load 最多重试5次
+
+
+ID3：
+
+
+ 本次session内首次load：（1-2-3-4-5……10s）时间间隔，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+
+【底价设置】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+本次session初始化时间戳 距离上次展示的时间是否超过24h，如果超过：
+ - 首次load：
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+ - 非首次load 或 未超过24h的情况：
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *3
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5
+ID2：corridor地板价格=上次展示ecpm *（0-7:*1.2；7-31:不设置地板价，31+:不设置地板价）
+     （0-7：若带corridor地板价的load 3次重试后无填充，则下次load立即恢复为无地板价；当ID2 load成功后刷新此规则）（若无上次展示ecpm则unit2不设置地板价）
+【PS】
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm包含该广告类型的所有ID
+；上次展示ecpm跨session重置。
+ID2 load的ecpm逻辑：
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0【可云控】。
+ID2 load的ecpm跨session不保留。
+
+
+
+【底价更新】
+- 当ID1/ID3连续N次load失败（包含重试次数），更新corridor地板价格=当前地板价*阶梯系数（每N次失败进行叠乘；ID1的N=1，ID3的N=2）
+高价值用户：ID1阶梯系数=(0.8,0.85,0.9,1,0.9)，ID3阶梯系数=(0.8,0.85,0.9)（若叠乘次数超过数组个数，走最后一位）
+中价值用户：ID1阶梯系数=(0.8,1,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+低价值用户：ID1阶梯系数=(0.8,0.9,0.9)，ID3阶梯系数=(0.8,0.85,0.9)
+- load失败 N的计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数
+- N计数清零的情况：上次展示ecpm进行了刷新，则下次load重回最初的corridor系数，计数也清零
+
+「31+」
+【插屏激励】（原始方案88607216）corridor系数 ID1&ID2&ID3三模型+特征1(XXNS-195_3_gp_1)
+加载设置：fsl_1001/rvl_1001
+
+
+【Load逻辑】初始化成功开始load （提前load），每次先load无底价adunit2，返回结果（成功/失败）后，再同时load高价adunit1和中价ad unit3（adunit2 ready状态算作load成功）
+
+
+【补位逻辑】广告展示成功didDisplayAd后，在收到max聚合didHideAd回调之后进行补位
+  - 每次AdX 的广告被消耗了（展示成功or失败都包括），自动触发MAX load。
+
+
+
+【直连】
+日韩台&低ecpm13国家：pangle client直连（插屏）
+
+加澳：bigo client直连（插屏）
+
+
+
+MAX聚合广告单元设置:
+
+
+【缓存逻辑】b2b多缓存: adunit1,2,3 均不禁用
+
+
+【重试逻辑】auto retry: 31+：adunit1,3 均禁用，adunit2不禁用
+
+
+【MAX后台】基于当前流量层底板（原始方案101290）+中价ad unit 3增加Google bidding
+
+
+
+
+客户端设置:
+
+
+【segment】无
+
+
+【重试逻辑】 ID1/ID2/ID3 若load失败 则客户端重试（当业务端发起load，打断重试逻辑，计数也清零）
+
+
+ID1：(2-3-4-5-6-6-6-6-6-6s) 间隔进行重试，针对本次load 最多10次；
+
+ID2：2的幂次方时间间隔，针对本次load 最多5次；
+
+
+ID3：
+
+
+ 本次session内首次load：固定5s重试，针对本次load 最多10次；
+
+
+ 本次session内非首次load：重试间隔采用等差递增机制，初始间隔为 2s，步长为 2s，单次 load 最多重试 8 次；
+
+
+PS：如果正在重试或者重试等待中，业务发起主动load/发起补位load会打断当前重试逻辑，重新开始新一轮重试&重试计数逻辑
+
+
+
+
+【底价设置】cs_1007
+【算法逻辑】
+- 命中方案 每次load(主动load或者补位)前请求预估接口下发预估ecpm设置corridor地板价
+包括（ID1,ID3），下发包括ecpm_list 和time_list,按照重试次数依次获取
+1.若如果请求超时(2s)或者异常数据（传值为空或者值非大于0），则当次load走底板逻辑
+2.若预估ecpm（有值）下发，则将其值设置corridor地板价
+3.接口格式和生效机制同最新接口，模型更新
+-- 有
+ID1高价：corridor地板价格=底价预估返回的ecpm
+ID3中价：corridor地板价格=底价预估返回的ecpm
+-- 无
+走底板
+
+
+
+- 本次session初始化时间戳 距离上次展示的时间是否超过24h,如果超过：
+
+
+  ---首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *4 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm)  *2.5 
+ID2兜底：不设置任何corridor价格
+
+
+  ---非首次load：
+
+
+ID1高价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3中价：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+- 如果没有超过：
+
+
+ID1：corridor地板价格=Max(上次展示ecpm , ID2
+ load的ecpm) *2.5 
+ID3：corridor地板价格= Max(上次展示ecpm , ID2
+ load的ecpm) *1.5 
+ID2：不设置任何corridor价格
+
+
+
+【PS】
+
+
+
+上次展示ecpm逻辑：无上次展示ecpm记为0。上次展示ecpm跨session重置。上次展示ecpm包含该广告类型的所有ID
+
+
+
+ID2 load的ecpm逻辑：
+
+
+
+默认为0，如果 ID2 load成功，取load回来的ecpm价格；如果ID2 load失败，ID2 ecpm记为0
+如果 ID2 先load成功又load失败，则取load成功过的价格。。
+
+
+
+ID2 load的ecpm跨session不保留。
+
+
+
+【配置老虎机】游戏方主动load前请求老虎机接口，超时时间2秒，最多重试3次。如果失败，走底板逻辑。  老虎机下发【底价设置逻辑
+
+】
+
+
+【底价更新】阶梯系数
+
+
+-  当ID1/ID3连续N次load失败（包含重试次数） ，(每N次失败叠乘*，ID1的N=1，ID3的N=1）
+
+ ID1:更新corridor地板价格=当前地板价*（0.7,0.75,0.8,0.85,0.9）（叠乘次数超出数组个数，则走最后一位）; ID3:更新corridor地板价格=当前地板价*0.9
+
+- 一旦上次展示ecpm有刷新，则下次load重回最初的corridor参数，计数也清零。
+
+（⚠️load失败计数逻辑：业务端发起的load失败和补位load失败都计数；ID1和ID3分开计数；）		陈威	【插屏】
+
+高价_全球_BlockBlast_GP_FS_112002_high_插屏1：caff883a0f82971e
+
+兜底_全球_BlockBlast_GP_FS_112002_bidding_插屏2：66596ff60629c78b
+
+中价_全球_BlockBlast_GP_FS_112002_Mid_插屏3：b4287bdadbae2b23			
+## Sheet: 排期
+owner	songmignzhan						
+方案号	发起人	技术	类型	方案号	发起人	技术	类型
+fs226601	底板			rv226601	底板		
+fs226602	底板			rv226602	底板		
+fs226603	底板			rv226603	底板		
+fs226604	刘春波	songmingzhan	调参	rv226604	刘春波	songmingzhan	调参
+fs226605	刘春波	songmingzhan	调参	rv226605	刘春波	songmingzhan	调参
+fs226606	刘春波	songmingzhan	调参	rv226606	刘春波	songmingzhan	调参
+fs226607	刘春波	songmingzhan	调参	rv226607	刘春波	songmingzhan	调参
+fs226608	袁树仑	songmingzhan	调参	rv226608	袁树仑	songmingzhan	调参
+fs226609	袁树仑	songmingzhan	调参	rv226609	袁树仑	songmingzhan	调参
+fs226610	袁树仑	songmingzhan	调参	rv226610	袁树仑	songmingzhan	调参
+fs226611	袁树仑	songmingzhan	调参	rv226611	袁树仑	songmingzhan	调参
+fs226612	袁树仑	songmingzhan	调参	rv226612	袁树仑	songmingzhan	调参
+fs226613	张小浩	songmingzhan	调参	rv226613	张小浩	songmingzhan	调参
+fs226614	张小浩	songmingzhan	调参	rv226614	张小浩	songmingzhan	调参
+fs226615	张小浩	songmingzhan	调参	rv226615	张小浩	songmingzhan	调参
+fs226616	张小浩	songmingzhan	调参	rv226616	张小浩	songmingzhan	调参
+fs226617	张小浩	songmingzhan	调参	rv226617	张小浩	songmingzhan	调参
+fs226618	张骁逸	songmingzhan	调参	rv226618	张骁逸	songmingzhan	调参
+fs226619	张骁逸	songmingzhan	调参	rv226619	张骁逸	songmingzhan	调参
+fs226620	张骁逸	songmingzhan	调参	rv226620	张骁逸	songmingzhan	调参
+fs226621	张骁逸	songmingzhan	调参	rv226621	张骁逸	songmingzhan	调参
+fs226622	张骁逸	songmingzhan	调参	rv226622	张骁逸	songmingzhan	调参
+fs226623		songmingzhan		rv226623		songmingzhan	
+fs226624		songmingzhan		rv226624		songmingzhan	
+fs226625		songmingzhan		rv226625		songmingzhan	
+fs226626		songmingzhan		rv226626		songmingzhan	
+fs226627		songmingzhan		rv226627		songmingzhan	
+fs226628		songmingzhan		rv226628		songmingzhan	
+fs226629		songmingzhan		rv226629		songmingzhan	

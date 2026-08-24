@@ -1,0 +1,1010 @@
+INFO 2026-08-13 20:43:38 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-13 20:43:46 django.server "GET /api/common/health/ HTTP/1.1" 200 77
+INFO 2026-08-13 20:43:46 django.server "GET /api/common/health/ HTTP/1.1" 200 77
+INFO 2026-08-13 20:43:47 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 200 121
+INFO 2026-08-13 20:43:47 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 200 124
+INFO 2026-08-13 20:44:06 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 200 121
+INFO 2026-08-14 10:09:13 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-14 10:09:14 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 200 124
+INFO 2026-08-14 10:10:47 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-14 10:10:55 django.server "POST /api/login/login/ HTTP/1.1" 200 295
+INFO 2026-08-14 10:10:56 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:10:56 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-14 10:10:56 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:10:56 django.server "GET /api/common/token_check/ HTTP/1.1" 200 172
+INFO 2026-08-14 10:10:56 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 3887
+INFO 2026-08-14 10:10:56 django.server "GET /api/home/daily_statistic/ HTTP/1.1" 200 268
+INFO 2026-08-14 10:11:00 django.server "OPTIONS /api/mock_api/rules/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:00 django.server "GET /api/mock_api/rules/ HTTP/1.1" 200 14754
+INFO 2026-08-14 10:11:01 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:11:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:11:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:11:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:11:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:11:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:11:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:12:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:12:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:12:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:12:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:12:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:12:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:12:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:12:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:12:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:12:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:12:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:12:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:13:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:13:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:13:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:13:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:13:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:13:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:13:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:13:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:13:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:13:41 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:13:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:13:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:14:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:14:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:14:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:14:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:14:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:14:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:14:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:14:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:14:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:14:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:14:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:14:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:15:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:15:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:15:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:15:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:15:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:15:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:15:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:15:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:15:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:15:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:15:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:15:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:16:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:16:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:16:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:16:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:16:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:16:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:16:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:16:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:16:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:16:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:16:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:16:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:17:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:17:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:17:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:17:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:17:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:17:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:17:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:17:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:17:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:17:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:17:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:17:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:18:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:18:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:18:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:18:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:18:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:18:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:18:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:18:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:18:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:18:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:18:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:18:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:19:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:19:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:19:10 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:19:10 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:19:20 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:19:20 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:19:30 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:19:30 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:19:40 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:19:40 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:19:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:19:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:20:00 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:20:00 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:20:11 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:20:11 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:20:21 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:20:21 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:20:31 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:20:31 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:20:41 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:20:41 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:20:51 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:20:51 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:21:01 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:21:01 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:21:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:21:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:22:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:22:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:23:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:23:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:24:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:24:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:25:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:25:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:26:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:26:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:27:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:27:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:28:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:28:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:29:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:29:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:30:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:30:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:31:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:31:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:32:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:32:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:33:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:33:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:34:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:34:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:35:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:35:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:36:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:36:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:37:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:37:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:38:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:38:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:39:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:39:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:40:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:40:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:41:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:41:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:42:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:42:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:43:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:43:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:44:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:44:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:45:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:45:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:46:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:46:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:47:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:47:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:48:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:48:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:49:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:49:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:50:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:50:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:51:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:51:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:52:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:52:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:53:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:53:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:54:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:54:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:55:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:55:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:56:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:56:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:57:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:57:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:58:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:58:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 10:59:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 10:59:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:00:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:00:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:01:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:01:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:02:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:02:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:03:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:03:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:04:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:04:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:05:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:05:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:06:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:06:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:07:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:07:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:08:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:08:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:09:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:09:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:10:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:10:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:11:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:11:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:12:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:12:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:13:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:13:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:14:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:14:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:15:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:15:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:16:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:16:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:17:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:17:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:18:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:18:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:19:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:19:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:20:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:20:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:21:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:21:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:22:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:22:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:23:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:23:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:24:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:24:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:25:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:25:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:26:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:26:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:27:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:27:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:28:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:28:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:29:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:29:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:30:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:30:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:31:05 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/base_utils/network_utils.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 13, 2026 - 20:43:38
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.22.28:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-14 11:31:06 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-14 11:31:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:31:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:32:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:32:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:33:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:33:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:34:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:34:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:35:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:35:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:36:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:36:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:37:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:37:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:38:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:38:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:39:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:39:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:40:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:40:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:41:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:41:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:42:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:42:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:43:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:43:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:44:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:44:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:45:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:45:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:46:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:46:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:47:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:47:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:48:48 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:48:48 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:48:50 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:48:50 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:49:01 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:49:01 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:49:11 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:49:11 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:49:21 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:49:21 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:49:31 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:49:31 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:49:41 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:49:41 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:49:51 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:49:51 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:50:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:50:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:51:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:51:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:52:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:52:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:53:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:53:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:54:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:54:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:55:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:55:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:56:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:56:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:57:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:57:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:58:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:58:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 11:59:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 11:59:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:00:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:00:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:01:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:01:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:02:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:02:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:03:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:03:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:04:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:04:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:05:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:05:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:06:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:06:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:07:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:07:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:08:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:08:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:09:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:09:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:10:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:10:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:11:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:11:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:12:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:12:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:13:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:13:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:14:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:14:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:15:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:15:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:16:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:16:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:17:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:17:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:18:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:18:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:19:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:19:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:20:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:20:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:21:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:21:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:22:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:22:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:23:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:23:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:24:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:24:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:25:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:25:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:26:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:26:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:27:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:27:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:28:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:28:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:29:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:29:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:30:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:30:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:31:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:31:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:32:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:32:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:33:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:33:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:34:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:34:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:35:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:35:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:36:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:36:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:37:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:37:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:38:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:38:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:39:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:39:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:40:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:40:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:41:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:41:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:42:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:42:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:43:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:43:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:44:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:44:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:45:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:45:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:46:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:46:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:47:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:47:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:48:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:48:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:49:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:49:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:50:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:50:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:51:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:51:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:52:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:52:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:53:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:53:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:54:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:54:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:55:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:55:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:56:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:56:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:57:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:57:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:58:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:58:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 12:59:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 12:59:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:00:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:00:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:01:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:01:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:02:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:02:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:03:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:03:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:04:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:04:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:05:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:05:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:06:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:06:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:07:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:07:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:08:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:08:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:09:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:09:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:10:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:10:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:11:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:11:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:12:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:12:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:13:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:13:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:14:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:14:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:15:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:15:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:16:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:16:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:17:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:17:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:18:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:18:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:19:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:19:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:20:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:20:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:21:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:21:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:22:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:22:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:23:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:23:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:24:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:24:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:25:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:25:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:26:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:26:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:27:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:27:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:28:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:28:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:29:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:29:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:30:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:30:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:31:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:31:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:32:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:32:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:33:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:33:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:34:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:34:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:35:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:35:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:36:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:36:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:37:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:37:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:38:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:38:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:39:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:39:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:40:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:40:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:41:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:41:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:42:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:42:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:43:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:43:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:44:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:44:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:45:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:45:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:46:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:46:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:47:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:47:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:48:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:48:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:49:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:49:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:50:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:50:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:51:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:51:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:52:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:52:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:53:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:53:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:54:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:54:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:55:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:55:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:56:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:56:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:57:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:57:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:58:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:58:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 13:59:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 13:59:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:00:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:00:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:01:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:01:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:02:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:02:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:03:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:03:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:04:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:04:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:05:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:05:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:06:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:06:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:07:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:07:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:08:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:08:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:09:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:09:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:10:49 django.server "OPTIONS /api/mock_api/proxy/status/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:10:49 django.server "GET /api/mock_api/proxy/status/ HTTP/1.1" 200 165
+INFO 2026-08-14 14:11:27 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-14 14:11:27 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:11:27 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-14 14:11:27 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+INFO 2026-08-14 14:11:27 django.server "GET /api/common/token_check/ HTTP/1.1" 200 172
+INFO 2026-08-14 14:11:27 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 3887
+INFO 2026-08-14 14:11:27 django.server "GET /api/home/daily_statistic/ HTTP/1.1" 200 268
+INFO 2026-08-17 20:33:39 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/youxi123_sso.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 14, 2026 - 11:31:07
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.22.28:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-17 20:33:40 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:22:49 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/models.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 17, 2026 - 20:33:41
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:22:50 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:23:04 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/youxi123_sso.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:22:50
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:23:04 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:23:21 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/config/settings.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:23:05
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:23:22 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:24:36 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apis/login/views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:23:22
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:24:37 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+WARNING 2026-08-18 10:25:00 django.request Bad Request: /api/login/youxi123/login_url/
+WARNING 2026-08-18 10:25:00 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 400 180
+INFO 2026-08-18 10:28:38 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/youxi123_sso.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:24:38
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:28:38 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:28:40 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/youxi123_sso.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 2 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api, users.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:28:38
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:28:40 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:28:47 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/models.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 2 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api, users.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:28:40
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:28:48 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:28:51 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/config/settings.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 2 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api, users.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:28:48
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:28:51 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:28:57 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apis/login/views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 2 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api, users.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:28:51
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:28:57 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+WARNING 2026-08-18 10:29:15 django.request Bad Request: /api/login/youxi123/login_url/
+WARNING 2026-08-18 10:29:15 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 400 165
+WARNING 2026-08-18 10:30:00 django.request Bad Request: /api/login/youxi123/login_url/
+WARNING 2026-08-18 10:30:00 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 400 165
+INFO 2026-08-18 10:30:45 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/apps/users/youxi123_sso.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 2 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api, users.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:28:57
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:30:45 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:30:46 django.server "GET /api/login/youxi123/login_url/ HTTP/1.1" 200 121
+INFO 2026-08-18 10:41:10 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:10 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:10 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+ERROR 2026-08-18 10:41:10 django.security.DisallowedHost Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/utils/deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/http/request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+WARNING 2026-08-18 10:41:10 django.server "GET /api/common/page_config/ HTTP/1.1" 400 72082
+ERROR 2026-08-18 10:41:32 django.security.DisallowedHost Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/utils/deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/http/request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+WARNING 2026-08-18 10:41:32 django.server "GET /api/common/page_config/ HTTP/1.1" 400 72082
+INFO 2026-08-18 10:41:32 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:32 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:32 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+ERROR 2026-08-18 10:41:33 django.security.DisallowedHost Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/utils/deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/http/request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+WARNING 2026-08-18 10:41:33 django.server "GET /api/common/page_config/ HTTP/1.1" 400 72082
+INFO 2026-08-18 10:41:33 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:33 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:33 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+ERROR 2026-08-18 10:41:34 django.security.DisallowedHost Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/utils/deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/http/request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '10.254.22.28:8000'. You may need to add '10.254.22.28' to ALLOWED_HOSTS.
+INFO 2026-08-18 10:41:34 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:34 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 10:41:34 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+WARNING 2026-08-18 10:41:34 django.server "GET /api/common/page_config/ HTTP/1.1" 400 72082
+WARNING 2026-08-18 10:42:02 django.request Unauthorized: /api/menu_management/menus/
+WARNING 2026-08-18 10:42:02 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 401 46
+INFO 2026-08-18 10:42:02 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-18 10:42:46 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/config/settings.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:30:45
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.56.159:8000/
+本机访问:   http://127.0.0.1:8000/
+INFO 2026-08-18 10:42:46 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 10:42:47 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+WARNING 2026-08-18 10:42:57 django.request Unauthorized: /api/menu_management/menus/
+WARNING 2026-08-18 10:42:57 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 401 46
+WARNING 2026-08-18 10:42:57 django.request Unauthorized: /api/common/token_check/
+WARNING 2026-08-18 10:42:57 django.server "GET /api/common/token_check/ HTTP/1.1" 401 84
+INFO 2026-08-18 11:04:09 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-18 11:04:09 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-18 11:04:09 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 11:04:09 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+INFO 2026-08-18 11:04:09 django.server "GET /api/common/token_check/ HTTP/1.1" 200 172
+INFO 2026-08-18 11:04:09 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 3887
+INFO 2026-08-18 11:04:10 django.server "GET /api/home/daily_statistic/ HTTP/1.1" 200 268
+INFO 2026-08-18 11:10:58 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-18 11:10:58 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-18 11:10:58 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 11:10:58 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+INFO 2026-08-18 11:10:58 django.server "GET /api/common/token_check/ HTTP/1.1" 200 172
+INFO 2026-08-18 11:10:58 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 3887
+INFO 2026-08-18 11:10:58 django.server "GET /api/home/daily_statistic/ HTTP/1.1" 200 268
+INFO 2026-08-18 11:10:59 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+INFO 2026-08-18 11:10:59 django.server "OPTIONS /api/common/token_check/ HTTP/1.1" 200 0
+INFO 2026-08-18 11:10:59 django.server "OPTIONS /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 0
+INFO 2026-08-18 11:10:59 django.server "OPTIONS /api/home/daily_statistic/ HTTP/1.1" 200 0
+INFO 2026-08-18 11:10:59 django.server "GET /api/common/token_check/ HTTP/1.1" 200 172
+INFO 2026-08-18 11:10:59 django.server "GET /api/menu_management/menus/?enabled_only=1 HTTP/1.1" 200 3887
+INFO 2026-08-18 11:10:59 django.server "GET /api/home/daily_statistic/ HTTP/1.1" 200 268
+INFO 2026-08-18 11:15:10 django.utils.autoreload /Users/admin/Desktop/ZnYan/auto_test_project/backend/config/settings.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 10:42:47
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.22.28:8000/
+本机访问:   http://127.0.0.1:8000/
+Traceback (most recent call last):
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/manage.py", line 22, in <module>
+    main()
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+    utility.execute()
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/core/management/__init__.py", line 382, in execute
+    settings.INSTALLED_APPS
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/conf/__init__.py", line 102, in __getattr__
+    self._setup(name)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/conf/__init__.py", line 89, in _setup
+    self._wrapped = Settings(settings_module)
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/django/conf/__init__.py", line 217, in __init__
+    mod = importlib.import_module(self.SETTINGS_MODULE)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1030, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/Users/admin/Desktop/ZnYan/auto_test_project/backend/config/settings.py", line 165, in <module>
+    if _local_ip:
+NameError: name '_local_ip' is not defined
+INFO 2026-08-18 11:17:08 django.utils.autoreload Watching for file changes with StatReloader
+/Users/admin/Desktop/ZnYan/auto_test_project/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO 2026-08-18 11:17:14 django.server "GET /api/common/page_config/ HTTP/1.1" 200 100
+Performing system checks...
+
+System check identified no issues (0 silenced).
+
+You have 1 unapplied migration(s). Your project may not work properly until you apply the migrations for app(s): mock_api.
+Run 'python manage.py migrate' to apply them.
+August 18, 2026 - 11:17:09
+Django version 4.2.29, using settings 'config.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
+
+局域网访问: http://10.254.22.28:8000/
+本机访问:   http://127.0.0.1:8000/

@@ -1,0 +1,17 @@
+2026-08-21 17:10:33,215 [INFO] mock_api: [MockApi] 已清空全部 0 条规则
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 已清空全部 0 条规则
+2026-08-21 17:10:33,225 [INFO] mock_api: [MockApi] 已添加规则: A面算法接口 (pattern=https://ecpm.afafb.com/infer/v1/ecpm, match=contains)
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 已添加规则: A面算法接口 (pattern=https://ecpm.afafb.com/infer/v1/ecpm, match=contains)
+2026-08-21 17:10:33,225 [INFO] mock_api: [MockApi] 从数据库加载了 1 条规则
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 从数据库加载了 1 条规则
+2026-08-21 17:10:33,226 [INFO] mock_api: [MockApi] 正在启动代理服务 → 0.0.0.0:8080
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 正在启动代理服务 → 0.0.0.0:8080
+2026-08-21 17:10:33,226 [INFO] mock_api: [MockApi] 当前共 1 条规则:
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 当前共 1 条规则:
+2026-08-21 17:10:33,226 [INFO] mock_api:   1. [contains] A面算法接口 → https://ecpm.afafb.com/infer/v1/ecpm
+INFO 2026-08-21 17:10:33 mock_api   1. [contains] A面算法接口 → https://ecpm.afafb.com/infer/v1/ecpm
+INFO 2026-08-21 17:10:33 mitmproxy.proxy.mode_servers HTTP(S) proxy listening at *:8080.
+2026-08-21 17:10:33,304 [INFO] mock_api: [MockApi] 代理已启动: http://0.0.0.0:8080
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 代理已启动: http://0.0.0.0:8080
+2026-08-21 17:10:33,304 [INFO] mock_api: [MockApi] 后台代理线程已启动 (port=8080)
+INFO 2026-08-21 17:10:33 mock_api [MockApi] 后台代理线程已启动 (port=8080)

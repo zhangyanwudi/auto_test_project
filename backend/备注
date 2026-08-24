@@ -1,0 +1,31 @@
+# 定时任务，需要启动调度器
+python manage.py run_task_scheduler
+
+# mock接口功能
+#   启动后自动检测本机IP，日志会显示:
+#     本地访问: http://127.0.0.1:8080
+#     网络访问: http://<本机IP>:8080
+
+1、前台运行
+# 0.0.0.0 监听所有网络接口（默认）
+python scripts/start_mock_proxy.py --port 8080
+# 仅本地访问
+python scripts/start_mock_proxy.py --host 127.0.0.1 --port 8080
+# 自动检测本机IP后绑定
+python scripts/start_mock_proxy.py --host auto --port 8080
+
+2、后台运行
+nohup python scripts/start_mock_proxy.py --host 0.0.0.0 --port 8080 --reload-interval 2 --background > logs/mock_proxy.log 2>&1 &
+
+# 查找进程
+ps aux | grep start_mock_proxy
+# 杀掉进程（发 SIGTERM，脚本会优雅退出）
+kill <PID>
+
+3、结合 JSON 配置文件 + 热加载
+python scripts/start_mock_proxy.py -c mock_config.json --watch
+
+# ====== 推荐：使用 service_manager.sh 批量管理 ======
+./service_manager.sh start       # 一键启动所有服务
+./service_manager.sh status      # 查看状态（含本机IP）
+./service_manager.sh stop        # 停止所有服务

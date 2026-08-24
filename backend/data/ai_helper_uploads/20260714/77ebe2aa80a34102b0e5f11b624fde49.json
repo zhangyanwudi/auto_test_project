@@ -1,0 +1,21 @@
+图片文件（已通过 OCR 提取文字内容）
+格式: PNG
+尺寸: 863 x 470 像素
+色彩模式: RGBA
+文件大小: 89.9 KB
+
+--- OCR 识别文字内容 ---
+请确认要测试第几行?直接回复行号(如4)，或回复「全部」测试所有行。
+案
+全部
+##热更测试报告
+-项目名称:ios_blcokblast_ab3.5_orth
+-底板方案号(左侧):rv176685
+-新方案号(右侧):rv217601
+-数据行号:第4行
+;两侧       -Key结构:☑一致(底板117/新方案117)
+-Value差异:6处
+---
+-[install_day_31.default_data.adwaynum]值变更:rv176685→rv217601
+-[install_day_7.default_data.adwaynum]值变更:rv176685→rv217601
+-[install_day_9999.country_filters[0].data.adwaynum]值变更:rv176685→ rv217601
