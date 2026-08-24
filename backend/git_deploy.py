@@ -26,9 +26,15 @@ git_deploy.py - 基于 git 的一键部署脚本
 
 使用方法：
     cd backend
-    python3 git_deploy.py
+    python3 git_deploy.py             # 完整部署（停服务 → 拉代码 → 装依赖 → 启服务）
+    python3 git_deploy.py --hot       # 热更（仅登录服务器拉取 git 代码更新，更新成功即结束）
+
+参数说明：
+    --hot / --hot-update  热更模式：不停服务、不安装依赖、不重启服务，
+                          仅通过 git 拉取远程代码，更新成功后即结束。
 """
 
+import argparse
 import os
 import sys
 import json
@@ -434,6 +440,18 @@ def git_pull(ssh, config):
     return True
 
 
+def hot_update_on_server(ssh, config):
+    """
+    热更：仅通过 git 拉取远程代码更新。
+    不停服务、不安装依赖、不重启服务，git 更新成功即结束。
+    """
+    log("正在执行热更（仅更新 git 代码）...", "STEP")
+    if not git_pull(ssh, config):
+        return False
+    log("热更完成", "OK")
+    return True
+
+
 def check_frontend_started(ssh, project_dir, max_wait=5):
     """
     检查前端服务是否真正启动成功。
@@ -636,9 +654,26 @@ def deploy_on_server(ssh, config):
     return True
 
 
+def parse_args():
+    """解析命令行参数：默认完整部署；--hot/--hot-update 为热更模式。"""
+    parser = argparse.ArgumentParser(description="基于 git 的一键部署脚本")
+    parser.add_argument(
+        "--hot", "--hot-update",
+        action="store_true",
+        dest="hot_update",
+        help="热更模式：仅登录服务器拉取 git 代码更新，更新成功即结束（不停服务、不装依赖、不重启）",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     log("=" * 40, "INFO")
-    log("git 一键部署启动", "STEP")
+    if args.hot_update:
+        log("git 热更启动（仅更新代码）", "STEP")
+    else:
+        log("git 一键部署启动", "STEP")
     log("=" * 40, "INFO")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -653,7 +688,10 @@ def main():
     deploy_success = False
     try:
         ssh = connect_server(config)
-        deploy_success = deploy_on_server(ssh, config)
+        if args.hot_update:
+            deploy_success = hot_update_on_server(ssh, config)
+        else:
+            deploy_success = deploy_on_server(ssh, config)
     except Exception as e:
         import traceback
         log(f"部署失败: {e}", "ERROR")
@@ -666,13 +704,14 @@ def main():
         if ssh:
             ssh.close()
 
+    action_desc = "热更" if args.hot_update else "部署"
     if deploy_success:
         log("=" * 40, "INFO")
         log("全部完成", "OK")
         log("=" * 40, "INFO")
     else:
         log("=" * 40, "INFO")
-        log("部署未完成，存在错误", "ERROR")
+        log(f"{action_desc}未完成，存在错误", "ERROR")
         log("=" * 40, "INFO")
         sys.exit(1)
 

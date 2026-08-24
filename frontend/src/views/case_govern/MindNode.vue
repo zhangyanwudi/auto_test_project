@@ -287,8 +287,10 @@ function onBlur() {
   font-size: 13px;
   color: #303133;
   max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.5;
 }
 
 .tcard-title-input {
