@@ -221,7 +221,9 @@ def case_mind(request, pk):
 
 def _normalize_node(node):
     """规范化单个思维导图节点（标题/类型/子节点）。"""
-    title = (node.get('title') or '').strip() or '未命名'
+    title = (node.get('title') or '').strip()
+    if not title and not (node.get('image') or '').strip():
+        title = '未命名'
     node_type = (node.get('node_type') or 'case').strip()
     if node_type not in NODE_TYPES:
         node_type = 'case'
@@ -244,13 +246,16 @@ def _normalize_node(node):
 def _replace_case_nodes(case_id, tree):
     """在事务内全量替换用例的思维导图节点（tree 根节点已规范化，需在事务中调用）。"""
     def _create(node, parent, sort):
+        title = node.get('title') or ''
+        if not title and not (node.get('image') or ''):
+            title = '未命名'
         n = ZCaseGovernCaseNode.objects.create(
             case_id=case_id,
             parent=parent,
             node_type=node.get('node_type') or 'case',
             is_smoke=bool(node.get('is_smoke')),
             exec_result=node.get('exec_result') or '',
-            title=node.get('title') or '未命名',
+            title=title,
             image=node.get('image') or '',
             sort_order=sort,
         )

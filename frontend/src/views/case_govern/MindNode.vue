@@ -31,7 +31,7 @@
         @keydown.esc="onEsc"
         @blur="onBlur"
       />
-      <span v-else class="tcard-title">{{ node.title || '未命名' }}</span>
+      <span v-else-if="node.title || !node.image" class="tcard-title">{{ node.title || '未命名' }}</span>
       <span
         v-if="node.node_type === 'case' && execResult !== 'none'"
         class="tcard-exec"
