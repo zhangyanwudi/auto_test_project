@@ -12,12 +12,15 @@ const app = createApp(App)
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
 
-// 应用启动时获取页面配置，设置浏览器标题
-fetchPageConfig().then(() => {
+// 应用启动时先获取页面配置（含 sso_enabled），再挂载，
+// 避免登录页在 fetchPageConfig 完成前读取 localStorage 导致统一登录入口不显示
+async function bootstrap() {
+  await fetchPageConfig()
   document.title = getPageTitle()
-})
+  app.mount('#app')
+}
 
-app.mount('#app')
+bootstrap()
 
 setOnUnauthorized((msg) => {
   ElMessage.error(msg || '登录已过期，请重新登录')
