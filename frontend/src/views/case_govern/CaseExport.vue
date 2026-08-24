@@ -16,6 +16,7 @@
       :case-name="caseName"
       @back="closeWindow"
       @saved="() => {}"
+      @loaded="onLoaded"
     />
   </div>
 </template>
@@ -35,6 +36,8 @@ const caseId = ref(null)
 const caseName = ref('')
 const updateTime = ref('')
 const exporting = ref(true)
+let exported = false
+let exportTimer = null
 
 function parseId() {
   const raw = Number(route.params.id)
@@ -62,6 +65,12 @@ function closeWindow() {
 }
 
 async function exportPdf() {
+  if (exported) return
+  exported = true
+  if (exportTimer) {
+    clearTimeout(exportTimer)
+    exportTimer = null
+  }
   const content = document.querySelector('.case-export-page .mind-content')
   const header = document.querySelector('.case-export-page .export-header')
   if (!content) {
@@ -113,11 +122,18 @@ async function exportPdf() {
   }
 }
 
+function onLoaded() {
+  // 思维导图数据已加载，再等节点渲染与 SVG 连线完成后截图导出
+  if (exported) return
+  if (exportTimer) clearTimeout(exportTimer)
+  exportTimer = setTimeout(exportPdf, 400)
+}
+
 onMounted(async () => {
   parseId()
   await loadName()
-  // 等待思维导图数据加载与 SVG 连线渲染完成后截图导出
-  setTimeout(exportPdf, 1500)
+  // 兜底：万一 loaded 事件未触发，8 秒后强制导出
+  exportTimer = setTimeout(exportPdf, 8000)
 })
 </script>
 

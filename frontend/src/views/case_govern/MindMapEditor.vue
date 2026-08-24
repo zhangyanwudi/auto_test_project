@@ -138,7 +138,7 @@ const props = defineProps({
   caseId: { type: [Number, String], required: true },
   caseName: { type: String, default: '' },
 })
-const emit = defineEmits(['saved', 'back', 'dirty-change'])
+const emit = defineEmits(['saved', 'back', 'dirty-change', 'loaded'])
 
 let uidCounter = 0
 function uid() {
@@ -420,6 +420,7 @@ async function load() {
   } finally {
     loading.value = false
   }
+  emit('loaded')
 }
 
 async function onSave(silent = false) {
