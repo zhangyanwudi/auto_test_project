@@ -119,7 +119,7 @@ const execTitle = computed(() => {
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const childCount = computed(() => (Array.isArray(props.node.children) ? props.node.children.length : 0))
 // 节点标题每行最多显示的字符数，达到该字数才换行
-const TITLE_LINE_CHARS = 20
+const TITLE_LINE_CHARS = 80
 const wrappedTitle = computed(() => {
   const title = props.node.title || ''
   if (!title) return '未命名'
@@ -199,6 +199,7 @@ function onBlur() {
   align-items: center;
   position: relative;
   padding: 4px 0;
+  width: max-content;
 }
 
 .tcard {
@@ -213,6 +214,7 @@ function onBlur() {
   cursor: pointer;
   position: relative;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -300,6 +302,7 @@ function onBlur() {
   color: #303133;
   white-space: pre-wrap;
   line-height: 1.5;
+  flex-shrink: 0;
 }
 
 .tcard-title-input {
