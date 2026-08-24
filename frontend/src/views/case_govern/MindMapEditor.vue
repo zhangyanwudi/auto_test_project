@@ -480,7 +480,7 @@ async function onSave(silent = false) {
     const res = await saveMindTree(props.caseId, serializeNode(tree))
     if (res.code === 0) {
       if (silent !== true) {
-        ElMessage.success(res.message || '已保存')
+        ElMessage.success(res.message || '用例已保存')
       }
       dirty.value = false
       deletedStack.value = []

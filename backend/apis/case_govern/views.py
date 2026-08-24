@@ -288,7 +288,7 @@ def case_mind_save(request, pk):
         # 保存节点后同步刷新用例主表更新时间（auto_now 自动置为当前时间）
         case.save(update_fields=['update_time'])
 
-    return JsonResponse({'code': 0, 'message': '思维导图已保存'})
+    return JsonResponse({'code': 0, 'message': '用例已保存'})
 
 
 # ── .emmx（MindMaster 思维导图）导入 ──────────────────────────────
