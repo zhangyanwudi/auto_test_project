@@ -273,7 +273,7 @@ def _replace_case_nodes(case_id, tree):
 def case_mind_save(request, pk):
     """保存思维导图：接收整棵树 JSON，事务内全量替换该用例的节点。"""
     try:
-        ZCaseGovernCase.objects.get(pk=pk)
+        case = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
     body = _parse_body(request)
@@ -285,6 +285,8 @@ def case_mind_save(request, pk):
 
     with transaction.atomic():
         _replace_case_nodes(pk, _normalize_node(tree))
+        # 保存节点后同步刷新用例主表更新时间（auto_now 自动置为当前时间）
+        case.save(update_fields=['update_time'])
 
     return JsonResponse({'code': 0, 'message': '思维导图已保存'})
 
