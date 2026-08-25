@@ -174,6 +174,8 @@ const dirty = ref(false)
 // 保存前已删除的节点记录（用于「撤销删除」恢复），保存成功后清空
 const deletedStack = ref([])
 const canUndoDelete = computed(() => deletedStack.value.length > 0)
+const dragSourceId = ref(null)
+const dropTargetId = ref(null)
 const links = ref([])
 const contentRef = ref(null)
 const nodeEls = {}
@@ -345,6 +347,47 @@ function undoDelete() {
   ElMessage.success('已撤销删除')
 }
 
+function moveNode(sourceId, targetId) {
+  if (props.readonly) return
+  if (!sourceId || !targetId || sourceId === targetId) return
+  if (sourceId === tree.id) return // 根节点不可移动
+  const source = findNode(tree, sourceId)
+  if (!source) return
+  // 目标不能是源节点自身或其子孙，避免成环
+  if (findNode(source, targetId)) return
+  const target = findNode(tree, targetId)
+  if (!target) return
+  const sourceParent = findParent(tree, sourceId)
+  if (!sourceParent) return
+  if (sourceParent.id === targetId) return // 已是该目标的子节点
+  // 取消原来连接
+  sourceParent.children = sourceParent.children.filter((c) => c.id !== sourceId)
+  // 连接到目标节点
+  target.children = target.children || []
+  target.children.push(source)
+  if (target.collapsed) target.collapsed = false
+  selectedId.value = sourceId
+  markDirty()
+  notify()
+  ElMessage.success('节点已移动')
+}
+
+function setDragSource(id) {
+  dragSourceId.value = id
+}
+
+function clearDragSource() {
+  dragSourceId.value = null
+}
+
+function setDropTarget(id) {
+  dropTargetId.value = id
+}
+
+function clearDropTarget() {
+  dropTargetId.value = null
+}
+
 function toggleCollapse(id) {
   const node = findNode(tree, id)
   if (!node) return
@@ -408,7 +451,9 @@ function unregisterNode(id) {
 
 let recomputeTimer = null
 function notify() {
-  if (recomputeTimer) return
+  if (recomputeTimer) {
+    clearTimeout(recomputeTimer)
+  }
   recomputeTimer = setTimeout(() => {
     recomputeTimer = null
     recomputeLinks()
@@ -437,8 +482,9 @@ function recomputeLinks() {
     collectEdges(tree, edges)
     const data = []
     for (const [pid, cid] of edges) {
-      const pe = nodeEls[pid]
-      const ce = nodeEls[cid]
+      // 实时从 DOM 查找节点元素，避免节点移动重新挂载时 nodeEls 引用失效
+      const pe = contentEl.querySelector(`[data-node-id="${pid}"]`)
+      const ce = contentEl.querySelector(`[data-node-id="${cid}"]`)
       if (!pe || !ce) continue
       const pr = pe.getBoundingClientRect()
       const cr = ce.getBoundingClientRect()
@@ -455,8 +501,9 @@ function recomputeLinks() {
   })
 }
 
-provide('mindOps', { select, edit, finishEdit, cancelEdit, addChild, addSibling, removeNode, toggleCollapse, toggleExecResult, setTitle, registerNode, unregisterNode, notify })
+provide('mindOps', { select, edit, finishEdit, cancelEdit, addChild, addSibling, removeNode, moveNode, toggleCollapse, toggleExecResult, setTitle, setDragSource, clearDragSource, setDropTarget, clearDropTarget, registerNode, unregisterNode, notify })
 provide('mindReadonly', props.readonly)
+provide('mindDrag', { dragSourceId, dropTargetId })
 
 function serializeNode(node) {
   return {

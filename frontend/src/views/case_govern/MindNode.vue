@@ -3,9 +3,15 @@
     <div
       ref="cardRef"
       class="tcard"
-      :class="[`tcard--${node.node_type || 'case'}`, { 'is-selected': selected }]"
+      :data-node-id="node.id"
+      :class="[`tcard--${node.node_type || 'case'}`, { 'is-selected': selected, 'is-drop-target': isDropTarget, 'is-dragging': isDragSource }]"
+      :draggable="draggable"
       @click.stop="onSelect"
       @dblclick.stop="onEdit"
+      @dragstart="onDragStart"
+      @dragover="onDragOver"
+      @drop="onDrop"
+      @dragend="onDragEnd"
     >
       <span
         v-if="hasChildren"
@@ -85,6 +91,7 @@ const props = defineProps({
 
 const ops = inject('mindOps')
 const readonly = inject('mindReadonly', false)
+const drag = inject('mindDrag', null)
 const cardRef = ref(null)
 const titleInput = ref(null)
 
@@ -138,6 +145,9 @@ const wrappedTitle = computed(() => {
 })
 const selected = computed(() => props.selectedId != null && props.node.id === props.selectedId)
 const isEditing = computed(() => props.editingId != null && props.node.id === props.editingId)
+const isDropTarget = computed(() => !!drag && drag.dropTargetId.value === props.node.id)
+const isDragSource = computed(() => !!drag && drag.dragSourceId.value === props.node.id)
+const draggable = computed(() => !readonly && !props.isRoot)
 
 watch(isEditing, (val) => {
   if (val) nextTick(() => titleInput.value?.focus())
@@ -172,6 +182,32 @@ function onAddSibling() {
 }
 function onRemove() {
   ops?.removeNode(props.node.id)
+}
+function onDragStart(e) {
+  if (readonly || props.isRoot) return
+  ops?.setDragSource(props.node.id)
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(props.node.id))
+  }
+}
+function onDragOver(e) {
+  if (readonly) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  ops?.setDropTarget(props.node.id)
+}
+function onDrop(e) {
+  if (readonly) return
+  e.preventDefault()
+  const sourceId = drag ? drag.dragSourceId.value : null
+  ops?.moveNode(sourceId, props.node.id)
+  ops?.clearDropTarget()
+  ops?.clearDragSource()
+}
+function onDragEnd() {
+  ops?.clearDropTarget()
+  ops?.clearDragSource()
 }
 function onToggleCollapse() {
   ops?.toggleCollapse(props.node.id)
@@ -233,6 +269,15 @@ function onBlur() {
 .tcard.is-selected {
   border-color: #409eff;
   box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.15);
+}
+
+.tcard.is-drop-target {
+  border-color: #67c23a;
+  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.2);
+}
+
+.tcard.is-dragging {
+  opacity: 0.45;
 }
 
 .tcard-toggle {
@@ -343,6 +388,7 @@ function onBlur() {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  -webkit-user-drag: none;
 }
 
 .tcard-actions {
