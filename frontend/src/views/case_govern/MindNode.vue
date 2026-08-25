@@ -35,7 +35,7 @@
       <span
         v-if="node.node_type === 'case' && execResult !== 'none'"
         class="tcard-exec"
-        :class="`tcard-exec--${execResult}`"
+        :class="[`tcard-exec--${execResult}`, { 'is-readonly': readonly }]"
         :title="execTitle"
         @click.stop="onToggleExec"
       >
@@ -52,7 +52,7 @@
         @click.stop
         @dblclick.stop
       />
-      <span class="tcard-actions">
+      <span v-if="!readonly" class="tcard-actions">
         <el-icon class="tact" title="新增子节点" @click.stop="onAddChild"><Plus /></el-icon>
         <el-icon v-if="!isRoot" class="tact" title="新增兄弟节点" @click.stop="onAddSibling"><Bottom /></el-icon>
         <el-icon v-if="!isRoot" class="tact tact--danger" title="删除节点" @click.stop="onRemove"><Delete /></el-icon>
@@ -84,6 +84,7 @@ const props = defineProps({
 })
 
 const ops = inject('mindOps')
+const readonly = inject('mindReadonly', false)
 const cardRef = ref(null)
 const titleInput = ref(null)
 
@@ -112,6 +113,11 @@ const execLabel = computed(() => {
   return '未执行'
 })
 const execTitle = computed(() => {
+  if (readonly) {
+    if (execResult.value === 'pass') return '已通过'
+    if (execResult.value === 'fail') return '不通过'
+    return '未执行'
+  }
   if (execResult.value === 'pass') return '已通过，点击标记为不通过'
   if (execResult.value === 'fail') return '不通过，点击重置为未执行'
   return '未执行，点击标记为通过'
@@ -155,6 +161,7 @@ function onSelect() {
   ops?.select(props.node.id)
 }
 function onEdit() {
+  if (readonly) return
   ops?.edit(props.node.id)
 }
 function onAddChild() {
@@ -170,6 +177,7 @@ function onToggleCollapse() {
   ops?.toggleCollapse(props.node.id)
 }
 function onToggleExec() {
+  if (readonly) return
   ops?.toggleExecResult(props.node.id)
 }
 function onTitleInput(e) {
@@ -296,6 +304,10 @@ function onBlur() {
 
 .tcard-exec--pass { background: #67c23a; }
 .tcard-exec--fail { background: #f56c6c; }
+
+.tcard-exec.is-readonly {
+  cursor: default;
+}
 
 .tcard-title {
   font-size: 13px;

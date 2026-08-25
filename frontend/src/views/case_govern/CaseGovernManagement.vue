@@ -61,7 +61,7 @@
           <el-table-column prop="update_time" label="更新时间" min-width="170" show-overflow-tooltip />
           <el-table-column label="操作" width="370" fixed="right">
             <template #default="{ row }">
-              <el-button type="primary" size="small" @click="openMindEditor(row)">设计用例</el-button>
+              <el-button type="primary" size="small" @click="openMindEditor(row)">{{ isOwner(row) ? '设计用例' : '查看用例' }}</el-button>
               <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
               <el-button size="small" type="warning" plain @click="onExport(row)">导出</el-button>
               <el-button size="small" type="success" plain @click="onShare(row)">分享</el-button>
@@ -144,9 +144,8 @@
 
     <el-dialog
       v-model="mindVisible"
-      title="用例设计"
-      width="90%"
-      top="4vh"
+      :title="mindCase && mindCase.readonly ? '查看用例' : '用例设计'"
+      fullscreen
       destroy-on-close
       class="mind-dialog"
       :close-on-click-modal="false"
@@ -158,6 +157,7 @@
         v-if="mindVisible && mindCase"
         :case-id="mindCase.id"
         :case-name="mindCase.case_name"
+        :readonly="mindCase.readonly"
         @saved="onMindSaved"
         @back="handleMindBack"
         @dirty-change="onMindDirty"
@@ -178,6 +178,7 @@ import {
   deleteCase,
   importCaseFromFile,
 } from '../../api/case_govern/caseGovern.js'
+import { getUserCnName, getUsername } from '../../common/request.js'
 import MindMapEditor from './MindMapEditor.vue'
 
 const loading = ref(false)
@@ -197,6 +198,13 @@ const importing = ref(false)
 const PRIORITY_LABELS = { 1: '高', 2: '中', 3: '低' }
 
 const showEmptyHint = computed(() => !loading.value && list.value.length === 0)
+
+/** 是否用例创建人（与后端 creator 取当前用户中文名/登录名一致）；无创建人记录时视为可编辑 */
+function isOwner(row) {
+  const creator = (row && row.creator || '').trim()
+  if (!creator) return true
+  return creator === getUserCnName() || creator === getUsername()
+}
 
 function priorityLabel(v) {
   return PRIORITY_LABELS[v] || String(v ?? '')
@@ -273,7 +281,7 @@ function openEditDialog(row) {
 }
 
 function openMindEditor(row) {
-  mindCase.value = { id: row.id, case_name: row.case_name }
+  mindCase.value = { id: row.id, case_name: row.case_name, readonly: !isOwner(row) }
   mindDirty.value = false
   mindVisible.value = true
 }
@@ -583,7 +591,16 @@ onMounted(() => {
   color: var(--el-text-color-placeholder);
 }
 
+:deep(.mind-dialog) {
+  display: flex;
+  flex-direction: column;
+}
+
 :deep(.mind-dialog .el-dialog__body) {
-  padding: 12px;
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 </style>

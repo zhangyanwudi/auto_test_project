@@ -12,12 +12,13 @@
         <el-button size="small" @click="expandAll">展开全部</el-button>
         <el-button size="small" @click="collapseAll">收起全部</el-button>
         <el-button
+          v-if="!readonly"
           size="small"
           :disabled="!canUndoDelete"
           title="撤销最近一次删除（Ctrl+Z / ⌘Z）"
           @click="undoDelete"
         >撤销删除</el-button>
-        <el-button size="small" type="primary" :loading="saving" @click="onSave()">保存</el-button>
+        <el-button v-if="!readonly" size="small" type="primary" :loading="saving" @click="onSave()">保存</el-button>
       </div>
     </div>
 
@@ -45,7 +46,7 @@
         </div>
       </div>
 
-      <div class="mind-panel">
+      <div v-if="!readonly" class="mind-panel">
         <template v-if="selectedNode">
           <div class="panel-head">节点编辑</div>
           <div class="panel-body">
@@ -55,10 +56,16 @@
               type="textarea"
               :rows="2"
               placeholder="输入节点文本"
+              :disabled="readonly"
               @input="onNodeEdit"
             />
             <p class="panel-label">节点类型</p>
-            <el-select v-model="selectedNode.node_type" style="width: 100%" @change="onNodeEdit">
+            <el-select
+              v-model="selectedNode.node_type"
+              style="width: 100%"
+              :disabled="readonly"
+              @change="onNodeEdit"
+            >
               <el-option
                 v-for="t in NODE_TYPES"
                 :key="t.value"
@@ -69,22 +76,22 @@
             <template v-if="selectedNode.node_type === 'case'">
               <p class="panel-label">冒烟测试</p>
               <div class="panel-smoke">
-                <el-switch v-model="selectedNode.is_smoke" @change="onNodeEdit" />
+                <el-switch v-model="selectedNode.is_smoke" :disabled="readonly" @change="onNodeEdit" />
                 <span class="panel-smoke-hint">标记为冒烟用例，优先执行</span>
               </div>
               <p class="panel-label">执行结果</p>
-              <el-radio-group v-model="selectedNode.exec_result" @change="onNodeEdit">
+              <el-radio-group v-model="selectedNode.exec_result" :disabled="readonly" @change="onNodeEdit">
                 <el-radio :label="''">未执行</el-radio>
                 <el-radio label="pass">通过</el-radio>
                 <el-radio label="fail">不通过</el-radio>
               </el-radio-group>
             </template>
-            <p class="panel-label">节点图片（选中后 Ctrl+V 粘贴）</p>
+            <p class="panel-label">{{ readonly ? '节点图片' : '节点图片（选中后 Ctrl+V 粘贴）' }}</p>
             <div class="panel-image">
               <img v-if="selectedNode.image" :src="selectedNode.image" class="panel-img" alt="" />
               <p v-else class="panel-img-hint">粘贴后在此显示预览</p>
               <el-button
-                v-if="selectedNode.image"
+                v-if="selectedNode.image && !readonly"
                 size="small"
                 type="danger"
                 plain
@@ -93,7 +100,7 @@
                 删除图片
               </el-button>
             </div>
-            <div class="panel-actions">
+            <div v-if="!readonly" class="panel-actions">
               <el-button size="small" type="primary" plain @click="addChild(selectedNode.id)">
                 <el-icon><Plus /></el-icon>新增子节点
               </el-button>
@@ -143,6 +150,7 @@ const NODE_TYPES = [
 const props = defineProps({
   caseId: { type: [Number, String], required: true },
   caseName: { type: String, default: '' },
+  readonly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved', 'back', 'dirty-change', 'loaded'])
 
@@ -198,6 +206,7 @@ function select(id) {
 }
 
 function edit(id) {
+  if (props.readonly) return
   selectedId.value = id
   editingId.value = id
   const node = findNode(tree, id)
@@ -215,6 +224,7 @@ function cancelEdit(id) {
 }
 
 function finishEdit(id) {
+  if (props.readonly) return
   // 仅当失焦的节点仍是当前编辑节点时才结束编辑，避免 Tab 建子节点等切换场景误触发
   if (id != null && editingId.value !== id) return
   editingId.value = null
@@ -237,11 +247,13 @@ function markDirty() {
 }
 
 function onNodeEdit() {
+  if (props.readonly) return
   markDirty()
   notify()
 }
 
 function setTitle(id, value) {
+  if (props.readonly) return
   const node = findNode(tree, id)
   if (!node) return
   node.title = value
@@ -250,6 +262,7 @@ function setTitle(id, value) {
 }
 
 function addChild(id) {
+  if (props.readonly) return
   const parent = findNode(tree, id)
   if (!parent) return
   parent.children = parent.children || []
@@ -262,6 +275,7 @@ function addChild(id) {
 }
 
 function addSibling(id) {
+  if (props.readonly) return
   if (id === tree.id) return
   const parent = findParent(tree, id)
   if (!parent) return
@@ -275,6 +289,7 @@ function addSibling(id) {
 }
 
 async function removeNode(id) {
+  if (props.readonly) return
   if (id === tree.id) return
   const node = findNode(tree, id)
   if (!node) return
@@ -316,6 +331,7 @@ async function removeNode(id) {
 }
 
 function undoDelete() {
+  if (props.readonly) return
   const record = deletedStack.value.pop()
   if (!record) return
   const parent = findParent(tree, record.parentId)
@@ -337,6 +353,7 @@ function toggleCollapse(id) {
 }
 
 function toggleExecResult(id) {
+  if (props.readonly) return
   const node = findNode(tree, id)
   if (!node) return
   // 循环切换：未执行 -> 通过 -> 不通过 -> 未执行
@@ -347,6 +364,7 @@ function toggleExecResult(id) {
 }
 
 function removeSelectedImage() {
+  if (props.readonly) return
   if (selectedNode.value) {
     selectedNode.value.image = ''
     markDirty()
@@ -438,6 +456,7 @@ function recomputeLinks() {
 }
 
 provide('mindOps', { select, edit, finishEdit, cancelEdit, addChild, addSibling, removeNode, toggleCollapse, toggleExecResult, setTitle, registerNode, unregisterNode, notify })
+provide('mindReadonly', props.readonly)
 
 function serializeNode(node) {
   return {
@@ -501,6 +520,7 @@ function onBack() {
 }
 
 function onGlobalKeydown(e) {
+  if (props.readonly) return
   const t = e.target
   const tag = (t && t.tagName) || ''
   if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(tag) || (t && t.isContentEditable)) {
@@ -544,6 +564,7 @@ function onGlobalKeydown(e) {
 }
 
 function onPaste(e) {
+  if (props.readonly) return
   const node = selectedNode.value
   if (!node) return
   const items = e.clipboardData?.items
@@ -587,7 +608,7 @@ onUnmounted(() => {
 .mind-editor {
   display: flex;
   flex-direction: column;
-  height: 72vh;
+  height: 100%;
   border: 1px solid var(--el-border-color);
   border-radius: 6px;
   overflow: hidden;
@@ -645,7 +666,7 @@ onUnmounted(() => {
 .mind-canvas {
   flex: 1;
   overflow: auto;
-  padding: 80px;
+  padding: 200px;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
     linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px);

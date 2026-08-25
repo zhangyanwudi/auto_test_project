@@ -276,6 +276,11 @@ def case_mind_save(request, pk):
         case = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    # 仅创建人可编辑（非创建人只能查看）
+    creator = (case.creator or '').strip()
+    current_user = _current_user_name(request)
+    if creator and current_user and creator != current_user:
+        return JsonResponse({'code': 403, 'message': '仅创建人可编辑该用例'}, status=403)
     body = _parse_body(request)
     if body is None:
         return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)
