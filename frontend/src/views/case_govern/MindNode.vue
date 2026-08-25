@@ -59,10 +59,6 @@
         @dblclick.stop
       />
       <span v-if="!readonly" class="tcard-actions">
-        <el-icon v-if="!isRoot" class="tact" title="复制" @click.stop="onCopy"><CopyDocument /></el-icon>
-        <el-icon class="tact" title="粘贴" @click.stop="onPaste"><DocumentAdd /></el-icon>
-        <el-icon class="tact" title="新增子节点" @click.stop="onAddChild"><Plus /></el-icon>
-        <el-icon v-if="!isRoot" class="tact" title="新增兄弟节点" @click.stop="onAddSibling"><Bottom /></el-icon>
         <el-icon v-if="!isRoot" class="tact tact--danger" title="删除节点" @click.stop="onRemove"><Delete /></el-icon>
       </span>
     </div>
@@ -82,7 +78,7 @@
 
 <script setup>
 import { computed, inject, onMounted, onUpdated, onUnmounted, ref, watch, nextTick } from 'vue'
-import { Plus, Bottom, Delete, CopyDocument, DocumentAdd, CircleCheck, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import { Delete, CircleCheck, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -176,22 +172,8 @@ function onEdit() {
   if (readonly) return
   ops?.edit(props.node.id)
 }
-function onAddChild() {
-  ops?.addChild(props.node.id)
-}
-function onAddSibling() {
-  ops?.addSibling(props.node.id)
-}
 function onRemove() {
   ops?.removeNode(props.node.id)
-}
-function onCopy() {
-  if (readonly) return
-  ops?.copyNode(props.node.id)
-}
-function onPaste() {
-  if (readonly) return
-  ops?.pasteNode(props.node.id)
 }
 function onDragStart(e) {
   if (readonly || props.isRoot) return
