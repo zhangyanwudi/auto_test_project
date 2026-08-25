@@ -645,7 +645,7 @@ onUnmounted(() => {
 .mind-canvas {
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: 80px;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
     linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px);
