@@ -176,6 +176,7 @@ const deletedStack = ref([])
 const canUndoDelete = computed(() => deletedStack.value.length > 0)
 const dragSourceId = ref(null)
 const dropTargetId = ref(null)
+const copiedNode = ref(null)
 const links = ref([])
 const contentRef = ref(null)
 const nodeEls = {}
@@ -372,6 +373,42 @@ function moveNode(sourceId, targetId) {
   ElMessage.success('节点已移动')
 }
 
+function cloneNodeWithNewIds(node) {
+  const clone = { ...node, id: uid(), children: [] }
+  if (Array.isArray(node.children)) {
+    clone.children = node.children.map((ch) => cloneNodeWithNewIds(ch))
+  }
+  return clone
+}
+
+function copyNode(id) {
+  if (props.readonly) return
+  if (id === tree.id) return // 根节点（整个用例）不复制
+  const node = findNode(tree, id)
+  if (!node) return
+  copiedNode.value = JSON.parse(JSON.stringify(node))
+  ElMessage.success('节点已复制')
+}
+
+function pasteNode(targetId) {
+  if (props.readonly) return
+  if (!copiedNode.value) {
+    ElMessage.warning('请先复制节点')
+    return
+  }
+  const target = findNode(tree, targetId)
+  if (!target) return
+  const clone = cloneNodeWithNewIds(copiedNode.value)
+  target.children = target.children || []
+  target.children.push(clone)
+  if (target.collapsed) target.collapsed = false
+  selectedId.value = clone.id
+  editingId.value = null
+  markDirty()
+  notify()
+  ElMessage.success('节点已粘贴')
+}
+
 function setDragSource(id) {
   dragSourceId.value = id
 }
@@ -501,7 +538,7 @@ function recomputeLinks() {
   })
 }
 
-provide('mindOps', { select, edit, finishEdit, cancelEdit, addChild, addSibling, removeNode, moveNode, toggleCollapse, toggleExecResult, setTitle, setDragSource, clearDragSource, setDropTarget, clearDropTarget, registerNode, unregisterNode, notify })
+provide('mindOps', { select, edit, finishEdit, cancelEdit, addChild, addSibling, removeNode, moveNode, copyNode, pasteNode, toggleCollapse, toggleExecResult, setTitle, setDragSource, clearDragSource, setDropTarget, clearDropTarget, registerNode, unregisterNode, notify })
 provide('mindReadonly', props.readonly)
 provide('mindDrag', { dragSourceId, dropTargetId })
 
@@ -586,6 +623,22 @@ function onGlobalKeydown(e) {
     if (deletedStack.value.length) {
       e.preventDefault()
       undoDelete()
+    }
+    return
+  }
+  // Ctrl+C / Cmd+C：复制选中节点（含其子树）
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+    if (selectedId.value != null) {
+      e.preventDefault()
+      copyNode(selectedId.value)
+    }
+    return
+  }
+  // Ctrl+V / Cmd+V：粘贴到选中节点
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+    if (selectedId.value != null) {
+      e.preventDefault()
+      pasteNode(selectedId.value)
     }
     return
   }
