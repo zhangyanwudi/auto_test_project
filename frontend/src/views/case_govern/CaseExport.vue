@@ -1,22 +1,35 @@
 <template>
   <div class="case-export-page">
-    <div class="export-tip">
-      <el-icon v-if="exporting" class="is-loading"><Loading /></el-icon>
-      {{ exporting ? '正在导出 PDF…' : '导出完成，可关闭窗口' }}
+    <div class="export-toolbar">
+      <div class="export-toolbar-left">
+        <el-icon><Download /></el-icon>
+        <span class="export-toolbar-title">{{ caseName || '用例' }}</span>
+        <span class="export-toolbar-meta">更新时间：{{ updateTime || '—' }}</span>
+      </div>
+      <div class="export-toolbar-actions">
+        <el-button type="primary" size="small" :loading="exporting" @click="exportXmind">
+          下载 XMind（推荐）
+        </el-button>
+        <el-button size="small" :loading="exporting" @click="exportSvg">下载 SVG</el-button>
+        <el-button size="small" :loading="exporting" @click="exportPng">下载 PNG</el-button>
+        <el-button size="small" :loading="exporting" @click="exportPdf">下载 PDF</el-button>
+      </div>
     </div>
+
     <div class="export-header">
       <div class="export-title">
         {{ caseName || '用例' }}
         <span class="export-meta">更新时间：{{ updateTime || '—' }}</span>
       </div>
     </div>
+
     <MindMapEditor
       v-if="caseId"
       :case-id="caseId"
       :case-name="caseName"
-      @back="closeWindow"
+      readonly
+      @back="() => {}"
       @saved="() => {}"
-      @loaded="onLoaded"
     />
   </div>
 </template>
@@ -25,19 +38,21 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import { Download } from '@element-plus/icons-vue'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import { fetchCaseList } from '../../api/case_govern/caseGovern.js'
+import { fetchCaseList, exportXmindFile } from '../../api/case_govern/caseGovern.js'
 import MindMapEditor from './MindMapEditor.vue'
 
 const route = useRoute()
 const caseId = ref(null)
 const caseName = ref('')
 const updateTime = ref('')
-const exporting = ref(true)
-let exported = false
-let exportTimer = null
+const exporting = ref(false)
+
+const TYPE_LABELS = { module: '模块', case: '用例', step: '步骤', expect: '预期', precondition: '前置条件' }
+const TYPE_COLORS = { module: '#409eff', case: '#67c23a', step: '#909399', expect: '#e6a23c', precondition: '#b882ff' }
+const EXEC_COLORS = { '通过': '#67c23a', '不通过': '#f56c6c', '未执行': '#909399' }
 
 function parseId() {
   const raw = Number(route.params.id)
@@ -60,51 +75,184 @@ async function loadName() {
   }
 }
 
-function closeWindow() {
-  window.close()
+function escapeXml(s) {
+  return String(s).replace(/[<>&"']/g, (c) => ({
+    '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;',
+  }[c]))
 }
 
-async function exportPdf() {
-  if (exported) return
-  exported = true
-  if (exportTimer) {
-    clearTimeout(exportTimer)
-    exportTimer = null
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function downloadText(text, filename, mime) {
+  downloadBlob(new Blob([text], { type: mime }), filename)
+}
+
+/* ---- SVG 导出：矢量文本，体积小，可缩放、可搜索 ---- */
+
+function collectSvgData(content) {
+  const cr = content.getBoundingClientRect()
+  const nodes = []
+  content.querySelectorAll('.tcard[data-node-id]').forEach((card) => {
+    const r = card.getBoundingClientRect()
+    const type = (card.className.match(/tcard--(\w+)/) || [])[1] || 'case'
+    const titleEl = card.querySelector('.tcard-title')
+    const title = titleEl ? titleEl.innerText : ''
+    const execEl = card.querySelector('.tcard-exec')
+    const exec = execEl ? execEl.innerText.trim() : ''
+    nodes.push({
+      x: r.left - cr.left,
+      y: r.top - cr.top,
+      w: r.width,
+      h: r.height,
+      type,
+      title: title || '（图片节点）',
+      exec,
+    })
+  })
+  const links = []
+  content.querySelectorAll('.mind-links path').forEach((p) => {
+    const d = p.getAttribute('d')
+    if (d) links.push(d)
+  })
+  return { width: cr.width, height: cr.height, nodes, links }
+}
+
+function buildSvg(data) {
+  const titleH = 44
+  const w = data.width
+  const h = data.height + titleH
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+  svg += `<rect width="100%" height="100%" fill="#ffffff"/>`
+  // 标题区
+  svg += `<text x="16" y="24" font-family="sans-serif" font-size="16" font-weight="600" fill="#303133">${escapeXml(caseName.value || '用例')}</text>`
+  svg += `<text x="16" y="40" font-family="sans-serif" font-size="12" fill="#909399">更新时间：${escapeXml(updateTime.value || '—')}</text>`
+  // 内容区（整体下移标题高度）
+  svg += `<g transform="translate(0,${titleH})">`
+  svg += `<g fill="none" stroke="#d5d9e2" stroke-width="1.5">`
+  data.links.forEach((d) => { svg += `<path d="${d}"/>` })
+  svg += `</g>`
+  data.nodes.forEach((n) => {
+    const color = TYPE_COLORS[n.type] || '#909399'
+    const label = TYPE_LABELS[n.type] || '用例'
+    svg += `<g>`
+    svg += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8" fill="#ffffff" stroke="#dcdfe6" stroke-width="1.5"/>`
+    // 标题（支持多行）
+    const lines = n.title.split('\n')
+    svg += `<text x="${n.x + 12}" y="${n.y + 20}" font-family="sans-serif" font-size="13" fill="#303133">`
+    lines.forEach((line, i) => {
+      svg += `<tspan x="${n.x + 12}" dy="${i === 0 ? 0 : 16}">${escapeXml(line)}</tspan>`
+    })
+    svg += `</text>`
+    // 类型标签 + 执行结果
+    svg += `<text x="${n.x + 12}" y="${n.y + n.h - 10}" font-family="sans-serif" font-size="10" fill="${color}">${label}</text>`
+    if (n.exec) {
+      svg += `<text x="${n.x + n.w - 12}" y="${n.y + n.h - 10}" font-family="sans-serif" font-size="10" fill="${EXEC_COLORS[n.exec] || '#909399'}" text-anchor="end">${escapeXml(n.exec)}</text>`
+    }
+    svg += `</g>`
+  })
+  svg += `</g>`
+  svg += `</svg>`
+  return svg
+}
+
+async function exportXmind() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const blob = await exportXmindFile(caseId.value)
+    downloadBlob(blob, `${caseName.value || '用例'}_用例.xmind`)
+    ElMessage.success('XMind 已导出')
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e.message || e))
+  } finally {
+    exporting.value = false
   }
+}
+
+function exportSvg() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const content = document.querySelector('.case-export-page .mind-content')
+    if (!content) throw new Error('未找到思维导图内容')
+    const data = collectSvgData(content)
+    const svg = buildSvg(data)
+    downloadText(svg, `${caseName.value || '用例'}_用例.svg`, 'image/svg+xml;charset=utf-8')
+    ElMessage.success('SVG 已导出')
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e.message || e))
+  } finally {
+    exporting.value = false
+  }
+}
+
+/* ---- PNG / PDF 导出：基于 html2canvas 截图 ---- */
+
+async function renderMergedCanvas() {
   const content = document.querySelector('.case-export-page .mind-content')
   const header = document.querySelector('.case-export-page .export-header')
-  if (!content) {
-    exporting.value = false
-    ElMessage.error('导出失败：未找到思维导图内容')
-    return
-  }
+  if (!content) throw new Error('未找到思维导图内容')
   // html2canvas 对百分比尺寸的 SVG 兼容性较差，截图前固定为内容实际像素尺寸
   const svg = content.querySelector('.mind-links')
   if (svg) {
     svg.style.width = `${content.scrollWidth}px`
     svg.style.height = `${content.scrollHeight}px`
   }
+  const opts = { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }
+  const contentCanvas = await html2canvas(content, opts)
+  const headerCanvas = header ? await html2canvas(header, opts) : null
+
+  const merged = document.createElement('canvas')
+  const mergedW = Math.max(contentCanvas.width, headerCanvas ? headerCanvas.width : 0)
+  const mergedH = contentCanvas.height + (headerCanvas ? headerCanvas.height : 0)
+  merged.width = mergedW
+  merged.height = mergedH
+  const ctx = merged.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, mergedW, mergedH)
+  let offsetY = 0
+  if (headerCanvas) {
+    ctx.drawImage(headerCanvas, (mergedW - headerCanvas.width) / 2, 0)
+    offsetY = headerCanvas.height
+  }
+  ctx.drawImage(contentCanvas, (mergedW - contentCanvas.width) / 2, offsetY)
+  return merged
+}
+
+async function exportPng() {
+  if (exporting.value) return
+  exporting.value = true
   try {
-    const opts = { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }
-    const contentCanvas = await html2canvas(content, opts)
-    const headerCanvas = header ? await html2canvas(header, opts) : null
+    const canvas = await renderMergedCanvas()
+    await new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error('PNG 生成失败')); return }
+        downloadBlob(blob, `${caseName.value || '用例'}_用例.png`)
+        resolve()
+      }, 'image/png')
+    })
+    ElMessage.success('PNG 已导出')
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e.message || e))
+  } finally {
+    exporting.value = false
+  }
+}
 
-    // 头部信息（用例名 + 更新时间）与思维导图内容垂直拼接为一张图
-    const merged = document.createElement('canvas')
-    const mergedW = Math.max(contentCanvas.width, headerCanvas ? headerCanvas.width : 0)
-    const mergedH = contentCanvas.height + (headerCanvas ? headerCanvas.height : 0)
-    merged.width = mergedW
-    merged.height = mergedH
-    const ctx = merged.getContext('2d')
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, mergedW, mergedH)
-    let offsetY = 0
-    if (headerCanvas) {
-      ctx.drawImage(headerCanvas, (mergedW - headerCanvas.width) / 2, 0)
-      offsetY = headerCanvas.height
-    }
-    ctx.drawImage(contentCanvas, (mergedW - contentCanvas.width) / 2, offsetY)
-
+async function exportPdf() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const merged = await renderMergedCanvas()
     const imgData = merged.toDataURL('image/png')
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
     const pageW = pdf.internal.pageSize.getWidth()
@@ -114,26 +262,17 @@ async function exportPdf() {
     const h = merged.height * ratio
     pdf.addImage(imgData, 'PNG', (pageW - w) / 2, (pageH - h) / 2, w, h)
     pdf.save(`${caseName.value || '用例'}_用例.pdf`)
-    exporting.value = false
-    setTimeout(() => window.close(), 800)
+    ElMessage.success('PDF 已导出')
   } catch (e) {
-    exporting.value = false
     ElMessage.error('导出失败：' + (e.message || e))
+  } finally {
+    exporting.value = false
   }
-}
-
-function onLoaded() {
-  // 思维导图数据已加载，再等节点渲染与 SVG 连线完成后截图导出
-  if (exported) return
-  if (exportTimer) clearTimeout(exportTimer)
-  exportTimer = setTimeout(exportPdf, 400)
 }
 
 onMounted(async () => {
   parseId()
   await loadName()
-  // 兜底：万一 loaded 事件未触发，8 秒后强制导出
-  exportTimer = setTimeout(exportPdf, 8000)
 })
 </script>
 
@@ -145,13 +284,41 @@ onMounted(async () => {
   box-sizing: border-box;
 }
 
-.export-tip {
+.export-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
   margin-bottom: 10px;
-  font-size: 13px;
-  color: #606266;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.export-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.export-toolbar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.export-toolbar-meta {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+.export-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .export-header {

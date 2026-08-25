@@ -28,6 +28,7 @@
         v-if="isEditing"
         ref="titleInput"
         class="tcard-title-input"
+        :style="editWidth ? { width: editWidth + 'px' } : null"
         :value="node.title"
         placeholder="未命名"
         @click.stop
@@ -37,11 +38,11 @@
         @keydown.esc="onEsc"
         @blur="onBlur"
       />
-      <span v-else-if="node.title || !node.image" class="tcard-title">{{ wrappedTitle }}</span>
+      <span v-else-if="node.title || !node.image" ref="titleRef" class="tcard-title">{{ wrappedTitle }}</span>
       <span
-        v-if="node.node_type === 'case' && execResult !== 'none'"
+        v-if="node.node_type === 'case'"
         class="tcard-exec"
-        :class="[`tcard-exec--${execResult}`, { 'is-readonly': readonly }]"
+        :class="`tcard-exec--${execResult}`"
         :title="execTitle"
         @click.stop="onToggleExec"
       >
@@ -92,6 +93,8 @@ const readonly = inject('mindReadonly', false)
 const drag = inject('mindDrag', null)
 const cardRef = ref(null)
 const titleInput = ref(null)
+const titleRef = ref(null)
+const editWidth = ref(null)
 
 const TYPE_META = {
   module: { label: '模块', color: '#409eff' },
@@ -170,6 +173,12 @@ function onSelect() {
 }
 function onEdit() {
   if (readonly) return
+  // 进入编辑前记录标题当前宽度，让编辑输入框与节点保持等宽，避免长标题节点编辑时变小
+  if (titleRef.value) {
+    editWidth.value = Math.max(titleRef.value.offsetWidth, 160)
+  } else {
+    editWidth.value = null
+  }
   ops?.edit(props.node.id)
 }
 function onRemove() {
@@ -205,7 +214,6 @@ function onToggleCollapse() {
   ops?.toggleCollapse(props.node.id)
 }
 function onToggleExec() {
-  if (readonly) return
   ops?.toggleExecResult(props.node.id)
 }
 function onTitleInput(e) {
@@ -342,10 +350,6 @@ function onBlur() {
 .tcard-exec--pass { background: #67c23a; }
 .tcard-exec--fail { background: #f56c6c; }
 
-.tcard-exec.is-readonly {
-  cursor: default;
-}
-
 .tcard-title {
   font-size: 13px;
   color: #303133;
@@ -357,7 +361,8 @@ function onBlur() {
 .tcard-title-input {
   font-size: 13px;
   color: #303133;
-  width: 160px;
+  box-sizing: border-box;
+  min-width: 160px;
   padding: 2px 6px;
   border: 1px solid #409eff;
   border-radius: 4px;

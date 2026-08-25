@@ -13,13 +13,15 @@
       :case-name="caseName"
       @back="goHome"
       @saved="() => {}"
+      @dirty-change="dirty = $event"
     />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { fetchCaseList } from '../../api/case_govern/caseGovern.js'
 import MindMapEditor from './MindMapEditor.vue'
 
@@ -27,6 +29,7 @@ const route = useRoute()
 const router = useRouter()
 const caseId = ref(null)
 const caseName = ref('')
+const dirty = ref(false)
 
 function parseId() {
   const raw = Number(route.params.id)
@@ -53,6 +56,21 @@ function goHome() {
 onMounted(() => {
   parseId()
   loadName()
+})
+
+// 拦截浏览器后退（Mac 左右滑动）等路由离开，未保存修改时先确认
+onBeforeRouteLeave(async () => {
+  if (!dirty.value) return true
+  try {
+    await ElMessageBox.confirm('思维导图有未保存的修改，离开后将丢失，确定离开吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '放弃修改并离开',
+      cancelButtonText: '继续编辑',
+    })
+    return true
+  } catch {
+    return false
+  }
 })
 </script>
 

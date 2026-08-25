@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.users.models import ZUser
 from apps.users.decorators import require_valid_token, require_super_admin
 from apps.role_management.models import ZRole
+from base_utils.time_base import format_datetime_utc8
 
 try:
     from base_utils.secrecy_base import md5_en
@@ -42,8 +43,8 @@ def _serialize_user(u):
         'user_power': u.user_power,
         'role_id': rid,
         'role_name': role_name or None,
-        'create_time': u.create_time.isoformat() if u.create_time else None,
-        'login_time': u.login_time.isoformat() if u.login_time else None,
+        'create_time': format_datetime_utc8(u.create_time),
+        'login_time': format_datetime_utc8(u.login_time),
     }
 
 

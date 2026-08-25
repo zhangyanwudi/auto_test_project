@@ -52,6 +52,27 @@ export async function saveMindTree(id, tree) {
   return res.json()
 }
 
+/** 更新单个节点的执行结果（非创建人查看时也可标记通过/不通过） */
+export async function updateNodeExecResult(id, nodeId, execResult) {
+  const res = await requestWithToken(`${BASE}/cases/${id}/mind/exec/`, {
+    method: 'POST',
+    body: JSON.stringify({ node_id: nodeId, exec_result: execResult }),
+  })
+  return res.json()
+}
+
+/** 导出用例为 .xmind 文件（返回 Blob） */
+export async function exportXmindFile(id) {
+  const res = await requestWithToken(`${BASE}/cases/${id}/export_xmind/`, {
+    method: 'GET',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message || '导出失败')
+  }
+  return res.blob()
+}
+
 /** 导入思维导图（.emmx / .xmind），后端按扩展名自动区分解析方式 */
 export async function importCaseFromFile(file) {
   const form = new FormData()

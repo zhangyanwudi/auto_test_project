@@ -9,6 +9,8 @@ urlpatterns = [
     path('cases/import_emmx/', views.case_import_emmx),
     path('cases/<int:pk>/mind/', views.case_mind),
     path('cases/<int:pk>/mind/save/', views.case_mind_save),
+    path('cases/<int:pk>/mind/exec/', views.case_node_exec),
+    path('cases/<int:pk>/export_xmind/', views.case_export_xmind),
     path('cases/<int:pk>/delete/', views.case_delete),
     path('cases/<int:pk>/', views.case_update),
 ]

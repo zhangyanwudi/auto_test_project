@@ -152,7 +152,7 @@
           </el-card>
         </div>
         <div v-else-if="activeView" class="page-content">
-          <component :is="activeView" />
+          <component :is="activeView" ref="activeViewRef" />
         </div>
         <div v-else class="page-content">
           <el-card shadow="hover">
@@ -169,7 +169,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, markRaw, reactive, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import {
@@ -200,6 +201,8 @@ import CaseGovernManagement from './case_govern/CaseGovernManagement.vue'
 
 const router = useRouter()
 const activeMenu = ref('home')
+/** 当前渲染的功能页面组件实例，用于路由离开守卫判断是否有未保存修改 */
+const activeViewRef = ref(null)
 /** 页面标题：读取 page_config.json 中的 page_tile_name */
 const pageTitle = ref(getPageTitle())
 /** 顶栏与欢迎语展示名：优先库中 user_cn_name */
@@ -574,6 +577,24 @@ onUnmounted(() => {
   window.removeEventListener('ai-tool-navigate', onAiToolNavigate)
   window.removeEventListener('resize', onHomeResize)
   disposeHomeCharts()
+})
+
+// 拦截浏览器后退（Mac 左右滑动）等路由离开；当前功能页（如用例管理）有未保存修改时先确认
+onBeforeRouteLeave(async () => {
+  const comp = activeViewRef.value
+  if (comp && typeof comp.hasUnsavedChanges === 'function' && comp.hasUnsavedChanges()) {
+    try {
+      await ElMessageBox.confirm('当前页面有未保存的修改，离开后将丢失，确定离开吗？', '提示', {
+        type: 'warning',
+        confirmButtonText: '放弃修改并离开',
+        cancelButtonText: '继续编辑',
+      })
+      return true
+    } catch {
+      return false
+    }
+  }
+  return true
 })
 </script>
 

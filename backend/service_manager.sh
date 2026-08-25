@@ -12,14 +12,16 @@
 #   4. status      — 查看所有服务的运行状态
 #   5. start-one   — 启动单个服务
 #   6. stop-one    — 停止单个服务
+#   7. restart-one — 重启单个服务
 #
 # 用法:
-#   ./service_manager.sh start            # 启动所有服务
-#   ./service_manager.sh stop             # 停止所有服务
-#   ./service_manager.sh restart          # 重启所有服务
-#   ./service_manager.sh status           # 查看所有服务状态
-#   ./service_manager.sh start-one <name> # 启动指定服务
-#   ./service_manager.sh stop-one <name>  # 停止指定服务
+#   ./service_manager.sh start               # 启动所有服务
+#   ./service_manager.sh stop                # 停止所有服务
+#   ./service_manager.sh restart             # 重启所有服务
+#   ./service_manager.sh status              # 查看所有服务状态
+#   ./service_manager.sh start-one <name>    # 启动指定服务
+#   ./service_manager.sh stop-one <name>     # 停止指定服务
+#   ./service_manager.sh restart-one <name>  # 重启指定服务
 # ==============================================================================
 
 set -e
@@ -682,6 +684,34 @@ cmd_stop_one() {
     echo ""
 }
 
+cmd_restart_one() {
+    local name="$1"
+    if [ -z "$name" ]; then
+        echo -e "${RED}用法: $0 restart-one <服务名>${NC}"
+        echo ""
+        echo "可用服务:"
+        for entry in "${SERVICES[@]}"; do
+            local sname
+            sname=$(parse_field "$entry" name)
+            echo "  - $sname"
+        done
+        exit 1
+    fi
+
+    local entry
+    entry=$(find_service "$name")
+    if [ -z "$entry" ]; then
+        echo -e "${RED}未找到服务: ${name}${NC}"
+        exit 1
+    fi
+
+    print_header "重启服务: ${name}"
+    stop_service "$entry"
+    sleep 1
+    start_service "$entry"
+    echo ""
+}
+
 cmd_list() {
     echo ""
     echo -e "${BOLD}已注册的服务:${NC}"
@@ -725,6 +755,7 @@ show_usage() {
     echo "  list                   列出所有已注册的服务"
     echo "  start-one <服务名>     启动指定服务"
     echo "  stop-one <服务名>      停止指定服务"
+    echo "  restart-one <服务名>   重启指定服务"
     echo ""
     echo "可用服务名:"
     for entry in "${SERVICES[@]}"; do
@@ -738,6 +769,7 @@ show_usage() {
     echo "  $0 status"
     echo "  $0 start-one mock-proxy"
     echo "  $0 stop-one django-runserver"
+    echo "  $0 restart-one task-scheduler"
     echo ""
 }
 
@@ -768,6 +800,10 @@ case "${1:-}" in
     stop-one)
         print_banner
         cmd_stop_one "$2"
+        ;;
+    restart-one)
+        print_banner
+        cmd_restart_one "$2"
         ;;
     *)
         print_banner

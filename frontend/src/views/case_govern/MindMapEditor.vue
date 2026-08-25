@@ -80,7 +80,7 @@
                 <span class="panel-smoke-hint">标记为冒烟用例，优先执行</span>
               </div>
               <p class="panel-label">执行结果</p>
-              <el-radio-group v-model="selectedNode.exec_result" :disabled="readonly" @change="onNodeEdit">
+              <el-radio-group v-model="selectedNode.exec_result" :disabled="readonly" @change="onExecResultChange">
                 <el-radio :label="''">未执行</el-radio>
                 <el-radio label="pass">通过</el-radio>
                 <el-radio label="fail">不通过</el-radio>
@@ -133,10 +133,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, provide, nextTick } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, provide, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bottom, Delete } from '@element-plus/icons-vue'
-import { fetchMindTree, saveMindTree } from '../../api/case_govern/caseGovern.js'
+import { fetchMindTree, saveMindTree, updateNodeExecResult } from '../../api/case_govern/caseGovern.js'
 import MindNode from './MindNode.vue'
 
 const NODE_TYPES = [
@@ -203,9 +203,14 @@ function findParent(root, id) {
   return null
 }
 
+// 记录右侧面板执行结果变更前的旧值，用于持久化失败时回滚
+let execResultBeforeEdit = ''
+
 function select(id) {
   selectedId.value = id
   editingId.value = null
+  const node = findNode(tree, id)
+  execResultBeforeEdit = node ? (node.exec_result || '') : ''
 }
 
 function edit(id) {
@@ -253,6 +258,31 @@ function onNodeEdit() {
   if (props.readonly) return
   markDirty()
   notify()
+}
+
+// 右侧面板「执行结果」变更：已保存节点立即持久化，避免依赖「保存」按钮导致标记丢失
+function onExecResultChange(val) {
+  if (props.readonly) return
+  const node = selectedNode.value
+  if (!node) return
+  const old = execResultBeforeEdit
+  execResultBeforeEdit = val
+  const isPersisted = typeof node.id === 'number' || /^\d+$/.test(String(node.id))
+  if (!isPersisted) {
+    markDirty()
+    return
+  }
+  updateNodeExecResult(props.caseId, node.id, val)
+    .then(() => {
+      ElMessage.success(
+        val === 'pass' ? '已标记为通过' : val === 'fail' ? '已标记为不通过' : '已重置为未执行',
+      )
+    })
+    .catch((e) => {
+      node.exec_result = old
+      notify()
+      ElMessage.error(e.message || '标记失败')
+    })
 }
 
 function setTitle(id, value) {
@@ -432,15 +462,31 @@ function toggleCollapse(id) {
   notify()
 }
 
-function toggleExecResult(id) {
-  if (props.readonly) return
+async function toggleExecResult(id) {
   const node = findNode(tree, id)
   if (!node) return
+  const old = node.exec_result
   // 循环切换：未执行 -> 通过 -> 不通过 -> 未执行
-  node.exec_result =
-    node.exec_result === 'pass' ? 'fail' : node.exec_result === 'fail' ? '' : 'pass'
-  markDirty()
+  const next = old === 'pass' ? 'fail' : old === 'fail' ? '' : 'pass'
+  node.exec_result = next
   notify()
+  // 已保存到数据库的节点（数字 id）可单独持久化执行结果；
+  // 新建未保存的节点（临时 id）仍需随整棵树一起保存
+  const isPersisted = typeof id === 'number' || /^\d+$/.test(String(id))
+  if (isPersisted) {
+    try {
+      await updateNodeExecResult(props.caseId, id, next)
+      ElMessage.success(
+        next === 'pass' ? '已标记为通过' : next === 'fail' ? '已标记为不通过' : '已重置为未执行',
+      )
+    } catch (e) {
+      node.exec_result = old
+      notify()
+      ElMessage.error(e.message || '标记失败')
+    }
+  } else {
+    markDirty()
+  }
 }
 
 function removeSelectedImage() {
@@ -693,10 +739,26 @@ onMounted(() => {
   window.addEventListener('keydown', onGlobalKeydown)
 })
 
+// 刷新/关闭标签页时，未保存修改给出浏览器原生提示
+function onBeforeUnload(e) {
+  if (!dirty.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+
+watch(dirty, (val) => {
+  if (val) {
+    window.addEventListener('beforeunload', onBeforeUnload)
+  } else {
+    window.removeEventListener('beforeunload', onBeforeUnload)
+  }
+})
+
 onUnmounted(() => {
   window.removeEventListener('paste', onPaste)
   window.removeEventListener('resize', notify)
   window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('beforeunload', onBeforeUnload)
   if (recomputeTimer) {
     clearTimeout(recomputeTimer)
     recomputeTimer = null

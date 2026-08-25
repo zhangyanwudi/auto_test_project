@@ -170,6 +170,24 @@ def format_iso8601(dt=None, tz_hours=8):
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + dt.strftime("%f")[:3] + dt.strftime("%z")
 
 
+def format_datetime_utc8(dt, template="YmdHMS"):
+    """
+    将 datetime 转成 UTC+8（北京时间）字符串。
+    平台约定：所有展示给用户的时间统一使用 UTC+8，后端序列化时统一走本函数。
+    - naive datetime 视为 UTC（与 Django USE_TZ=True 下数据库存储一致）
+    - aware datetime 直接按其自身时区转换
+    :param dt: datetime 对象，可为 None
+    :param template: 时间格式模板（见 _date_template），默认 %Y-%m-%d %H:%M:%S
+    :return: 格式化后的字符串；dt 为 None 时返回 None
+    """
+    if dt is None:
+        return None
+    tz = ZoneInfo("Asia/Shanghai")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(tz).strftime(_date_template(template))
+
+
 if __name__ == '__main__':
     # print(get_before(days=-33,is_tmiestamp=True))
     # print(get_before(days=-15,is_tmiestamp=True))

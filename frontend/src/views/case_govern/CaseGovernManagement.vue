@@ -515,6 +515,11 @@ onMounted(() => {
   loadList()
   loadModules()
 })
+
+// 供 Home 的路由离开守卫调用：判断当前是否有未保存的思维导图修改
+defineExpose({
+  hasUnsavedChanges: () => mindDirty.value,
+})
 </script>
 
 <style scoped>

@@ -1,14 +1,18 @@
+import base64
+import hashlib
 import io
 import json
 import logging
+import posixpath
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+from urllib.parse import quote
 
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -296,12 +300,221 @@ def case_mind_save(request, pk):
     return JsonResponse({'code': 0, 'message': '用例已保存'})
 
 
+@csrf_exempt
+@require_http_methods(['POST'])
+@require_valid_token
+def case_node_exec(request, pk):
+    """更新单个节点的执行结果（非创建人也可标记测试通过/不通过）。"""
+    try:
+        case = ZCaseGovernCase.objects.get(pk=pk)
+    except ZCaseGovernCase.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    body = _parse_body(request)
+    if body is None:
+        return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)
+    node_id = body.get('node_id')
+    exec_result = (body.get('exec_result') or '').strip()
+    if node_id is None:
+        return JsonResponse({'code': 400, 'message': '缺少 node_id'}, status=400)
+    if exec_result not in ('', 'pass', 'fail'):
+        return JsonResponse({'code': 400, 'message': '执行结果须为 pass/fail/空'}, status=400)
+    try:
+        node = ZCaseGovernCaseNode.objects.get(case_id=pk, id=node_id)
+    except ZCaseGovernCaseNode.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '节点不存在'}, status=404)
+    node.exec_result = exec_result
+    node.save(update_fields=['exec_result', 'update_time'])
+    # 同步刷新用例主表更新时间
+    case.save(update_fields=['update_time'])
+    return JsonResponse({'code': 0, 'message': '执行结果已更新'})
+
+
+# 节点图片（base64 data URL）的 MIME 类型到文件扩展名映射
+MIME_EXT = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/bmp': '.bmp',
+    'image/svg+xml': '.svg',
+}
+# 文件扩展名到 MIME 类型的反向映射（用于 .emmx 导入时按 media 文件扩展名推断）
+EXT_MIME = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'bmp': 'image/bmp',
+    'svg': 'image/svg+xml',
+}
+
+
+def _parse_data_url(data_url):
+    """解析 base64 data URL，返回 (mime_type, raw_bytes)；解析失败返回 (None, None)。"""
+    s = (data_url or '').strip()
+    if not s.startswith('data:'):
+        return None, None
+    try:
+        meta, b64 = s.split(',', 1)
+    except ValueError:
+        return None, None
+    # meta 形如 "data:image/png;base64" 或 "data:image/png"
+    mime = 'image/png'
+    header = meta[len('data:'):]
+    if ';' in header:
+        mime_part = header.split(';', 1)[0].strip().lower()
+    else:
+        mime_part = header.strip().lower()
+    if mime_part.startswith('image/'):
+        mime = mime_part
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        return None, None
+    return mime, raw
+
+
+def _node_to_xmind_topic(node, image_srcs=None):
+    """将用例节点树转为 XMind（新版 content.json）topic 结构。
+
+    image_srcs: dict[node_id -> "xap:resources/xxx.png"]，用于给有截图的节点挂图片。
+    """
+    nid = node.get('id')
+    title = node.get('title') or ''
+    # 冒烟、执行结果以标题后缀形式展示（可靠、任何 XMind 版本均可显示）
+    marks = []
+    if node.get('is_smoke'):
+        marks.append('冒烟')
+    exec_result = node.get('exec_result') or ''
+    if exec_result == 'pass':
+        marks.append('通过')
+    elif exec_result == 'fail':
+        marks.append('不通过')
+    if marks:
+        title = '%s【%s】' % (title, '·'.join(marks))
+    topic = {
+        'id': str(nid) if nid is not None else 'root',
+        'class': 'topic',
+        'title': title,
+        # 逻辑图（向右）：根在左、子节点向右单侧展开，与设计用例页面布局一致
+        'structureClass': 'org.xmind.ui.logic.right',
+    }
+    # 节点截图：作为 topic 的 image 引用（图片二进制已写入 zip 的 resources/ 目录）
+    src = (image_srcs or {}).get(nid)
+    if src:
+        topic['image'] = {'src': src}
+    children = node.get('children') or []
+    if children:
+        topic['children'] = {'attached': [_node_to_xmind_topic(c, image_srcs) for c in children]}
+    return topic
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+@require_valid_token
+def case_export_xmind(request, pk):
+    """导出用例为 .xmind 思维导图文件（ZIP 内含新版 content.json）。"""
+    try:
+        case = ZCaseGovernCase.objects.get(pk=pk)
+    except ZCaseGovernCase.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+
+    rows = list(
+        ZCaseGovernCaseNode.objects.filter(case_id=pk)
+        .order_by('sort_order', 'id')
+        .values('id', 'parent_id', 'node_type', 'is_smoke', 'exec_result', 'title', 'image')
+    )
+    roots = _build_tree(rows)
+    if roots:
+        root = roots[0]
+    else:
+        root = {'id': None, 'title': case.case_name or '用例', 'children': []}
+
+    # 收集节点截图：解析 base64 data URL，写入 zip 的 resources/ 目录，
+    # 同一张图片（按内容 hash 去重）只写一份。
+    image_srcs = {}
+    resource_files = {}
+    for r in rows:
+        mime, raw = _parse_data_url(r.get('image') or '')
+        if not raw:
+            continue
+        filename = hashlib.sha256(raw).hexdigest() + MIME_EXT.get(mime, '.png')
+        path = 'resources/%s' % filename
+        resource_files[path] = raw
+        image_srcs[r['id']] = 'xap:%s' % path
+
+    sheet = {
+        'id': '%s-sheet' % pk,
+        'class': 'sheet',
+        'title': case.case_name or '用例',
+        'rootTopic': _node_to_xmind_topic(root, image_srcs),
+    }
+    metadata = {'creator': {'name': case.creator or '', 'version': '1.0.0'}}
+    manifest = {'file-entries': {'content.json': {}, 'metadata.json': {}}}
+    for path in resource_files:
+        manifest['file-entries'][path] = {}
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('content.json', json.dumps([sheet], ensure_ascii=False))
+        zf.writestr('metadata.json', json.dumps(metadata, ensure_ascii=False))
+        zf.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False))
+        for path, data in resource_files.items():
+            zf.writestr(path, data)
+    buf.seek(0)
+
+    filename = quote((case.case_name or '用例') + '.xmind')
+    resp = HttpResponse(buf.read(), content_type='application/vnd.xmind.workbook')
+    resp['Content-Disposition'] = "attachment; filename*=UTF-8''%s" % filename
+    return resp
+
+
 # ── .emmx（MindMaster 思维导图）导入 ──────────────────────────────
 
 def _extract_emmx_text(shape):
     """提取 Shape 内所有 <tp> 文本并折叠空白。"""
     parts = [tp.text or '' for tp in shape.iter('tp')]
     return re.sub(r'\s+', ' ', ''.join(parts)).strip()
+
+
+def _parse_emmx_rels(zf):
+    """解析 .emmx 关系文件（rels/*.xml），返回 {rId: zip 内 media 路径}。"""
+    rel_map = {}
+    rel_names = [
+        n for n in zf.namelist()
+        if n.lower().startswith('rels/') and n.lower().endswith('.xml')
+    ]
+    for rel_name in rel_names:
+        try:
+            rel_root = ET.fromstring(zf.read(rel_name))
+        except ET.ParseError:
+            continue
+        rel_dir = posixpath.dirname(rel_name)
+        for rel in rel_root.iter('Relationship'):
+            rid = rel.get('Id')
+            target = rel.get('Target')
+            if not rid or not target:
+                continue
+            # target 是相对 rels 文件所在目录的路径，规范化为 zip 内路径
+            rel_map[rid] = posixpath.normpath(posixpath.join(rel_dir, target))
+    return rel_map
+
+
+def _extract_emmx_image(shape, rel_map, media_data):
+    """提取 Shape 内图片，返回 base64 data URL；无图片返回空字符串。"""
+    for img in shape.iter('Image'):
+        rid = img.get('Name') or img.get('Id')
+        if not rid:
+            continue
+        path = rel_map.get(rid)
+        if not path or path not in media_data:
+            continue
+        ext = posixpath.splitext(path)[1].lower().lstrip('.')
+        mime = EXT_MIME.get(ext, 'image/png')
+        return 'data:%s;base64,%s' % (mime, base64.b64encode(media_data[path]).decode('ascii'))
+    return ''
 
 
 def _parse_emmx(raw_bytes):
@@ -318,6 +531,15 @@ def _parse_emmx(raw_bytes):
                 break
         if xml_bytes is None:
             raise ValueError('未找到思维导图内容（MainIdea/MainTopic）')
+
+        # 解析关系文件并预读所有 media 图片（在 zip 关闭前完成读取）
+        rel_map = _parse_emmx_rels(zf)
+        media_data = {}
+        for path in set(rel_map.values()):
+            try:
+                media_data[path] = zf.read(path)
+            except KeyError:
+                continue
 
     try:
         page = ET.fromstring(xml_bytes)
@@ -342,12 +564,18 @@ def _parse_emmx(raw_bytes):
             sl = ld.find('SubLevel')
             if sl is not None:
                 subs = [x for x in (sl.get('V') or '').split(';') if x]
+        text = _extract_emmx_text(shape)
+        image = _extract_emmx_image(shape, rel_map, media_data)
+        # 图片节点：MindMaster 用占位文本 "p" 表示（节点仅含图片、无文字），清空避免展示 "p"
+        if image and text == 'p':
+            text = ''
         topics[sid] = {
             'id': sid,
             'typ': typ,
-            'text': _extract_emmx_text(shape),
+            'text': text,
             'super': super_id,
             'subs': subs,
+            'image': image,
         }
 
     root = next((t for t in topics.values() if t['typ'] == 'MainIdea'), None)
@@ -477,12 +705,17 @@ def _topics_to_tree(topics, root):
     """将思维导图主题扁平表转成思维导图树，按层级映射节点类型。"""
     def build(tid, depth):
         t = topics[tid]
+        text = t['text'] or ''
+        image = t.get('image') or ''
+        # 纯图片节点（无文字、有图片）标题保持为空，仅文字与图片都缺失时补「未命名」
+        if not text and not image:
+            text = '未命名'
         return {
-            'title': t['text'] or '未命名',
+            'title': text,
             'node_type': IMPORT_DEPTH_TYPE.get(depth, 'case'),
             'is_smoke': False,
             'exec_result': '',
-            'image': '',
+            'image': image,
             'children': [build(cid, depth + 1) for cid in t['subs'] if cid in topics],
         }
 
