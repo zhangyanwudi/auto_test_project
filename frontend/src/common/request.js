@@ -137,7 +137,25 @@ export async function requestWithToken(url, options = {}) {
   if (fetchInit.cache === undefined && method === 'GET') {
     fetchInit.cache = 'no-store'
   }
-  const res = await fetch(resolvedUrl, fetchInit)
+
+  let res
+  try {
+    res = await fetch(resolvedUrl, fetchInit)
+  } catch (e) {
+    // GET/HEAD 幂等：网络错误（如后端 runserver 热重载瞬间）自动重试一次
+    if (method === 'GET' || method === 'HEAD') {
+      await new Promise((r) => setTimeout(r, 800))
+      try {
+        res = await fetch(resolvedUrl, fetchInit)
+      } catch (e2) {
+        console.error('[request] fetch 失败:', resolvedUrl, e2)
+        throw new Error('网络请求失败，请检查服务是否正常')
+      }
+    } else {
+      console.error('[request] fetch 失败:', resolvedUrl, e)
+      throw new Error('网络请求失败，请检查服务是否正常')
+    }
+  }
 
   if (res.status === 401) {
     clearToken()

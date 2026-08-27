@@ -44,7 +44,7 @@
         <div class="header-left">
           <el-breadcrumb separator="/">
             <el-breadcrumb-item>
-              <span role="button" tabindex="0" @click="activeMenu = 'home'" class="breadcrumb-link">首页</span>
+              <span role="button" tabindex="0" @click="setActiveMenu('home')" class="breadcrumb-link">首页</span>
             </el-breadcrumb-item>
             <el-breadcrumb-item v-if="breadcrumb">{{ breadcrumb }}</el-breadcrumb-item>
           </el-breadcrumb>
@@ -169,7 +169,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, markRaw, reactive, nextTick } from 'vue'
-import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
@@ -200,6 +200,7 @@ import MockApiManagement from './mock_api/MockApiManagement.vue'
 import CaseGovernManagement from './case_govern/CaseGovernManagement.vue'
 
 const router = useRouter()
+const route = useRoute()
 const activeMenu = ref('home')
 /** 当前渲染的功能页面组件实例，用于路由离开守卫判断是否有未保存修改 */
 const activeViewRef = ref(null)
@@ -400,6 +401,30 @@ function canonicalMenuCode(raw) {
   return s
 }
 
+/** 当前侧栏页签同步到地址栏 query（?menu=xxx），刷新/恢复标签页后能回到原页面；
+ *  用 history.replaceState 只改地址栏，不触发路由守卫（避免误触 onBeforeRouteLeave 的未保存确认） */
+function syncMenuToUrl(menu) {
+  const url = new URL(window.location.href)
+  if (!menu || menu === 'home') {
+    url.searchParams.delete('menu')
+  } else {
+    url.searchParams.set('menu', menu)
+  }
+  window.history.replaceState(window.history.state, '', url.toString())
+}
+
+/** 设置当前侧栏页签，并同步到 URL */
+function setActiveMenu(menu) {
+  const c = canonicalMenuCode(menu) || 'home'
+  activeMenu.value = c
+  syncMenuToUrl(c)
+}
+
+/** 从 URL query 恢复上次停留的侧栏页签（无则首页） */
+function menuFromUrl() {
+  return canonicalMenuCode(route.query.menu) || 'home'
+}
+
 /** 是否与侧栏已下发菜单一致：只要当前 menu_code 在接口返回中存在即视为可看该页（接口已按角色过滤） */
 function isSidebarAuthorizedFor(code) {
   const c = canonicalMenuCode(code)
@@ -496,8 +521,8 @@ function syncTitleMap(flat) {
 function ensureActiveMenuValid(flat) {
   const codes = new Set(flat.map((x) => canonicalMenuCode(x.menu_code)).filter(Boolean))
   const cur = canonicalMenuCode(activeMenu.value)
-  if (!codes.has(cur)) {
-    activeMenu.value = 'home'
+  if (cur !== 'home' && !codes.has(cur)) {
+    setActiveMenu('home')
   }
 }
 
@@ -523,7 +548,7 @@ async function loadSidebarMenus() {
 }
 
 function handleMenuSelect(index, _indexPath) {
-  activeMenu.value = canonicalMenuCode(index)
+  setActiveMenu(index)
 }
 
 function handleCommand(command) {
@@ -555,12 +580,12 @@ async function refreshUserDisplayName() {
 function onAiToolNavigate(e) {
   const menu = e.detail?.menu
   if (menu && viewMap[menu]) {
-    activeMenu.value = menu
+    setActiveMenu(menu)
   }
 }
 
 onMounted(() => {
-  activeMenu.value = 'home'
+  activeMenu.value = menuFromUrl()
   pageTitle.value = getPageTitle()
   document.title = pageTitle.value
   username.value = getUserCnName() || '管理员'

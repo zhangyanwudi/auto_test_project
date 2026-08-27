@@ -1,16 +1,14 @@
 <template>
-  <div class="tnode">
+  <div class="tnode" @dragover="onDragOver" @drop="onDrop">
     <div
       ref="cardRef"
       class="tcard"
       :data-node-id="node.id"
-      :class="[`tcard--${node.node_type || 'case'}`, { 'is-selected': selected, 'is-drop-target': isDropTarget, 'is-dragging': isDragSource }]"
+      :class="[`tcard--${node.node_type || 'case'}`, { 'is-selected': selected, 'is-dragging': isDragSource }, dropMode ? `is-drop-${dropMode}` : '']"
       :draggable="draggable"
       @click.stop="onSelect"
       @dblclick.stop="onEdit"
       @dragstart="onDragStart"
-      @dragover="onDragOver"
-      @drop="onDrop"
       @dragend="onDragEnd"
     >
       <span
@@ -146,7 +144,10 @@ const wrappedTitle = computed(() => {
 })
 const selected = computed(() => props.selectedId != null && props.node.id === props.selectedId)
 const isEditing = computed(() => props.editingId != null && props.node.id === props.editingId)
-const isDropTarget = computed(() => !!drag && drag.dropTargetId.value === props.node.id)
+const dropMode = computed(() => {
+  if (!drag || drag.dropTargetId.value !== props.node.id) return ''
+  return drag.dropMode?.value || 'inside'
+})
 const isDragSource = computed(() => !!drag && drag.dragSourceId.value === props.node.id)
 const draggable = computed(() => !readonly && !props.isRoot)
 
@@ -186,6 +187,7 @@ function onRemove() {
 }
 function onDragStart(e) {
   if (readonly || props.isRoot) return
+  console.log('[mind] onDragStart', { id: props.node.id, isRoot: props.isRoot })
   ops?.setDragSource(props.node.id)
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
@@ -195,18 +197,40 @@ function onDragStart(e) {
 function onDragOver(e) {
   if (readonly) return
   e.preventDefault()
+  e.stopPropagation()
+  console.log('[mind] onDragOver', { id: props.node.id })
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  ops?.setDropTarget(props.node.id)
+  // 按鼠标在卡片内的纵向位置判断放置模式：上1/3=同级插到前，下1/3=同级插到后，中间=成为子节点
+  let mode = 'inside'
+  const rect = cardRef.value?.getBoundingClientRect()
+  if (rect && rect.height > 0) {
+    const ratio = (e.clientY - rect.top) / rect.height
+    if (ratio < 0.33) mode = 'before'
+    else if (ratio > 0.67) mode = 'after'
+  }
+  ops?.setDropTarget(props.node.id, mode)
 }
 function onDrop(e) {
   if (readonly) return
   e.preventDefault()
+  e.stopPropagation()
   const sourceId = drag ? drag.dragSourceId.value : null
-  ops?.moveNode(sourceId, props.node.id)
+  // 按松手时的实际位置重算放置模式，避免依赖 dragover 最后一次状态
+  // （松手瞬间鼠标位置可能已从 before/after 漂移到 inside，导致蓝标与结果不一致）
+  let mode = 'inside'
+  const rect = cardRef.value?.getBoundingClientRect()
+  if (rect && rect.height > 0) {
+    const ratio = (e.clientY - rect.top) / rect.height
+    if (ratio < 0.33) mode = 'before'
+    else if (ratio > 0.67) mode = 'after'
+  }
+  console.log('[mind] onDrop', { sourceId, targetId: props.node.id, mode })
+  ops?.moveNode(sourceId, props.node.id, mode)
   ops?.clearDropTarget()
   ops?.clearDragSource()
 }
 function onDragEnd() {
+  console.log('[mind] onDragEnd', { id: props.node.id })
   ops?.clearDropTarget()
   ops?.clearDragSource()
 }
@@ -271,9 +295,15 @@ function onBlur() {
   box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.15);
 }
 
-.tcard.is-drop-target {
+.tcard.is-drop-inside {
   border-color: #67c23a;
   box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.2);
+}
+.tcard.is-drop-before {
+  border-top: 3px solid #409eff;
+}
+.tcard.is-drop-after {
+  border-bottom: 3px solid #409eff;
 }
 
 .tcard.is-dragging {

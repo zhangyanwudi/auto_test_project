@@ -176,6 +176,8 @@ const deletedStack = ref([])
 const canUndoDelete = computed(() => deletedStack.value.length > 0)
 const dragSourceId = ref(null)
 const dropTargetId = ref(null)
+// 放置模式：inside=成为子节点 before=同级插到目标前 after=同级插到目标后
+const dropMode = ref('inside')
 const copiedNode = ref(null)
 const links = ref([])
 const contentRef = ref(null)
@@ -378,25 +380,47 @@ function undoDelete() {
   ElMessage.success('已撤销删除')
 }
 
-function moveNode(sourceId, targetId) {
-  if (props.readonly) return
-  if (!sourceId || !targetId || sourceId === targetId) return
-  if (sourceId === tree.id) return // 根节点不可移动
+function moveNode(sourceId, targetId, mode = 'inside') {
+  console.log('[mind] moveNode enter', { sourceId, targetId, mode })
+  if (props.readonly) { console.log('[mind] moveNode return: readonly'); return }
+  if (!sourceId || !targetId || sourceId === targetId) { console.log('[mind] moveNode return: id check'); return }
+  if (sourceId === tree.id) { console.log('[mind] moveNode return: root'); return } // 根节点不可移动
+  if (mode !== 'inside' && mode !== 'before' && mode !== 'after') mode = 'inside'
   const source = findNode(tree, sourceId)
-  if (!source) return
+  if (!source) { console.log('[mind] moveNode return: no source'); return }
   // 目标不能是源节点自身或其子孙，避免成环
-  if (findNode(source, targetId)) return
+  if (findNode(source, targetId)) { console.log('[mind] moveNode return: cycle'); return }
   const target = findNode(tree, targetId)
-  if (!target) return
+  if (!target) { console.log('[mind] moveNode return: no target'); return }
   const sourceParent = findParent(tree, sourceId)
-  if (!sourceParent) return
-  if (sourceParent.id === targetId) return // 已是该目标的子节点
-  // 取消原来连接
-  sourceParent.children = sourceParent.children.filter((c) => c.id !== sourceId)
-  // 连接到目标节点
-  target.children = target.children || []
-  target.children.push(source)
-  if (target.collapsed) target.collapsed = false
+  if (!sourceParent) { console.log('[mind] moveNode return: no sourceParent'); return }
+
+  if (mode === 'inside') {
+    if (sourceParent.id === targetId) return // 已是该目标的子节点
+    // 从原父节点移除
+    sourceParent.children = sourceParent.children.filter((c) => c.id !== sourceId)
+    // 连接到目标节点（成为子节点）
+    target.children = target.children || []
+    target.children.push(source)
+    if (target.collapsed) target.collapsed = false
+  } else {
+    // 同级排序：目标为根节点时插到其子列表最前/最后；否则插到目标节点前/后
+    const targetParent = targetId === tree.id ? tree : findParent(tree, targetId)
+    if (!targetParent) return
+    // 先统一从原位置移除（可能与目标同父，也可能不同父）
+    sourceParent.children = sourceParent.children.filter((c) => c.id !== sourceId)
+    const siblings = targetParent.children || []
+    let insertAt
+    if (targetId === tree.id) {
+      insertAt = mode === 'before' ? 0 : siblings.length
+    } else {
+      const idx = siblings.findIndex((c) => c.id === targetId)
+      if (idx === -1) return
+      insertAt = mode === 'before' ? idx : idx + 1
+    }
+    siblings.splice(insertAt, 0, source)
+  }
+
   selectedId.value = sourceId
   markDirty()
   notify()
@@ -447,12 +471,14 @@ function clearDragSource() {
   dragSourceId.value = null
 }
 
-function setDropTarget(id) {
+function setDropTarget(id, mode = 'inside') {
   dropTargetId.value = id
+  dropMode.value = mode
 }
 
 function clearDropTarget() {
   dropTargetId.value = null
+  dropMode.value = 'inside'
 }
 
 function toggleCollapse(id) {
@@ -586,7 +612,7 @@ function recomputeLinks() {
 
 provide('mindOps', { select, edit, finishEdit, cancelEdit, addChild, addSibling, removeNode, moveNode, copyNode, pasteNode, toggleCollapse, toggleExecResult, setTitle, setDragSource, clearDragSource, setDropTarget, clearDropTarget, registerNode, unregisterNode, notify })
 provide('mindReadonly', props.readonly)
-provide('mindDrag', { dragSourceId, dropTargetId })
+provide('mindDrag', { dragSourceId, dropTargetId, dropMode })
 
 function serializeNode(node) {
   return {

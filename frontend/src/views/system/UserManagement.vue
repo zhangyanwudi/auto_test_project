@@ -20,6 +20,7 @@
         </el-table-column>
         <el-table-column prop="user_power" label="权限" width="80"/>
         <el-table-column prop="create_time" label="创建时间" min-width="170" show-overflow-tooltip/>
+        <el-table-column prop="login_time" label="最近登录时间" min-width="170" show-overflow-tooltip/>
         <el-table-column label="角色" min-width="160">
           <template #default="{ row }">
             <el-tag v-if="row.is_admin" type="warning" size="small" class="mr">系统管理员</el-tag>

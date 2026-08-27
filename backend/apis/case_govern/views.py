@@ -376,6 +376,10 @@ def _parse_data_url(data_url):
     return mime, raw
 
 
+# 冒烟用例按执行结果给节点文字上色：通过绿色、不通过红色（与前端 SVG 导出用色一致）
+EXEC_RESULT_COLOR = {'pass': '#67c23a', 'fail': '#f56c6c'}
+
+
 def _node_to_xmind_topic(node, image_srcs=None):
     """将用例节点树转为 XMind（新版 content.json）topic 结构。
 
@@ -401,6 +405,12 @@ def _node_to_xmind_topic(node, image_srcs=None):
         # 逻辑图（向右）：根在左、子节点向右单侧展开，与设计用例页面布局一致
         'structureClass': 'org.xmind.ui.logic.right',
     }
+    # 冒烟用例执行结果给节点文字上色：fo:color 控制 XMind 主题文字颜色
+    if node.get('is_smoke') and exec_result in EXEC_RESULT_COLOR:
+        topic['style'] = {
+            'id': 'style:%s' % topic['id'],
+            'properties': {'fo:color': EXEC_RESULT_COLOR[exec_result]},
+        }
     # 节点截图：作为 topic 的 image 引用（图片二进制已写入 zip 的 resources/ 目录）
     src = (image_srcs or {}).get(nid)
     if src:
