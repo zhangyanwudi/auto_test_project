@@ -484,11 +484,13 @@ function clearDropTarget() {
 }
 
 function toggleCollapse(id) {
-  if (props.readonly) return
   const node = findNode(tree, id)
   if (!node) return
   node.collapsed = !node.collapsed
-  markDirty()
+  // 查看（只读）模式下允许临时收起/展开，但不标记修改、不保存，不影响创建人的折叠状态
+  if (!props.readonly) {
+    markDirty()
+  }
   notify()
 }
 
