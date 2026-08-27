@@ -135,7 +135,7 @@
                 <el-tag size="small" type="info" effect="plain">最近 10 条</el-tag>
               </div>
             </template>
-            <el-table :data="homeRecentList" v-loading="homeLoading" stripe size="medium" empty-text="今日暂无比对记录">
+            <el-table :data="homeRecentList" v-loading="homeLoading" stripe size="default" empty-text="今日暂无比对记录">
               <el-table-column prop="create_time" label="时间" width="180" sortable />
               <el-table-column prop="user_name" label="用户" width="120" />
               <el-table-column prop="project_names" label="项目" min-width="160" show-overflow-tooltip />

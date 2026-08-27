@@ -57,7 +57,7 @@
         :data="recentList"
         v-loading="loading"
         stripe
-        size="medium"
+        size="default"
         empty-text="今日暂无比对记录"
       >
         <el-table-column prop="create_time" label="时间" width="180" sortable />

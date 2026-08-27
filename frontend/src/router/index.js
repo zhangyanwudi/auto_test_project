@@ -20,7 +20,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   // SSO 回调：URL 带 ticket，先验证换取 token 再进入目标页
   if (to.query && to.query.ticket) {
     try {
@@ -28,14 +28,12 @@ router.beforeEach(async (to, from, next) => {
       if (data.code === 0) {
         const clean = { ...to.query }
         delete clean.ticket
-        next({ path: to.path, query: clean, replace: true })
-        return
+        return { path: to.path, query: clean, replace: true }
       }
     } catch (e) {
       // 验证失败走登录页
     }
-    next({ path: '/' })
-    return
+    return { path: '/' }
   }
 
   if (to.meta.requiresAuth) {
@@ -43,11 +41,11 @@ router.beforeEach(async (to, from, next) => {
     if (!token || isTokenExpired()) {
       clearToken()
       ElMessage.warning('登录已过期，请重新登录')
-      next({ path: '/', query: { redirect: to.fullPath } })
-      return
+      return { path: '/', query: { redirect: to.fullPath } }
     }
   }
-  next()
+  // 放行
+  return true
 })
 
 export default router
