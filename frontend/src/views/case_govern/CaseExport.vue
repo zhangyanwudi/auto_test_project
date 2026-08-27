@@ -1,12 +1,11 @@
 <template>
   <div class="case-export-page">
-    <div class="export-toolbar">
-      <div class="export-toolbar-left">
-        <el-icon><Download /></el-icon>
-        <span class="export-toolbar-title">{{ caseName || '用例' }}</span>
-        <span class="export-toolbar-meta">更新时间：{{ updateTime || '—' }}</span>
+    <div class="export-header">
+      <div class="export-title">
+        {{ caseName || '用例' }}
+        <span class="export-meta">更新时间：{{ updateTime || '—' }}</span>
       </div>
-      <div class="export-toolbar-actions">
+      <div class="export-actions">
         <el-button type="primary" size="small" :loading="exporting" @click="exportXmind">
           下载 XMind（推荐）
         </el-button>
@@ -16,18 +15,12 @@
       </div>
     </div>
 
-    <div class="export-header">
-      <div class="export-title">
-        {{ caseName || '用例' }}
-        <span class="export-meta">更新时间：{{ updateTime || '—' }}</span>
-      </div>
-    </div>
-
     <MindMapEditor
       v-if="caseId"
       :case-id="caseId"
       :case-name="caseName"
       readonly
+      expand-on-load
       @back="() => {}"
       @saved="() => {}"
     />
@@ -38,7 +31,6 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { fetchCaseList, exportXmindFile } from '../../api/case_govern/caseGovern.js'
@@ -199,7 +191,7 @@ function exportSvg() {
 
 async function renderMergedCanvas() {
   const content = document.querySelector('.case-export-page .mind-content')
-  const header = document.querySelector('.case-export-page .export-header')
+  const header = document.querySelector('.case-export-page .export-title')
   if (!content) throw new Error('未找到思维导图内容')
   // html2canvas 对百分比尺寸的 SVG 兼容性较差，截图前固定为内容实际像素尺寸
   const svg = content.querySelector('.mind-links')
@@ -284,56 +276,24 @@ onMounted(async () => {
   box-sizing: border-box;
 }
 
-.export-toolbar {
+.export-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
-  margin-bottom: 10px;
-  background: #fff;
-  border-radius: 6px;
-}
-
-.export-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.export-toolbar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.export-toolbar-meta {
-  font-size: 12px;
-  color: #909399;
-  white-space: nowrap;
-}
-
-.export-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.export-header {
-  display: inline-block;
-  min-width: 200px;
+  width: 100%;
   padding: 12px 16px;
   margin-bottom: 12px;
   background: #fff;
   border-radius: 6px;
+  box-sizing: border-box;
 }
 
 .export-title {
   display: flex;
   align-items: baseline;
   gap: 12px;
+  min-width: 0;
   font-size: 16px;
   font-weight: 600;
   color: #303133;
@@ -345,6 +305,13 @@ onMounted(async () => {
   font-weight: 400;
   color: #909399;
   white-space: nowrap;
+}
+
+.export-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* 导出页仅展示画布，隐藏工具栏与右侧编辑面板 */

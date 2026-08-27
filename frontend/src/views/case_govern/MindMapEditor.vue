@@ -151,6 +151,8 @@ const props = defineProps({
   caseId: { type: [Number, String], required: true },
   caseName: { type: String, default: '' },
   readonly: { type: Boolean, default: false },
+  // 只读场景（导出/分享）下加载后强制全部展开，仅前端展示，不写回数据库
+  expandOnLoad: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved', 'back', 'dirty-change', 'loaded'])
 
@@ -482,9 +484,11 @@ function clearDropTarget() {
 }
 
 function toggleCollapse(id) {
+  if (props.readonly) return
   const node = findNode(tree, id)
   if (!node) return
   node.collapsed = !node.collapsed
+  markDirty()
   notify()
 }
 
@@ -620,6 +624,7 @@ function serializeNode(node) {
     node_type: node.node_type || 'case',
     is_smoke: !!node.is_smoke,
     exec_result: node.exec_result || '',
+    collapsed: !!node.collapsed,
     image: node.image || '',
     children: (node.children || []).map(serializeNode),
   }
@@ -636,9 +641,14 @@ async function load() {
       tree.node_type = d.node_type || 'module'
       tree.is_smoke = !!d.is_smoke
       tree.exec_result = d.exec_result || ''
+      tree.collapsed = !!d.collapsed
       tree.image = d.image || ''
       tree.children = d.children || []
       selectedId.value = tree.id
+      // 导出/分享等只读场景：加载后强制全部展开，仅影响前端展示，不修改已保存的折叠状态
+      if (props.expandOnLoad) {
+        setAllCollapsed(false)
+      }
       notify()
     }
   } catch {

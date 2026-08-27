@@ -204,7 +204,7 @@ def case_mind(request, pk):
     rows = list(
         ZCaseGovernCaseNode.objects.filter(case_id=pk)
         .order_by('sort_order', 'id')
-        .values('id', 'parent_id', 'node_type', 'is_smoke', 'exec_result', 'title', 'image')
+        .values('id', 'parent_id', 'node_type', 'is_smoke', 'exec_result', 'collapsed', 'title', 'image')
     )
     roots = _build_tree(rows)
     if roots:
@@ -216,6 +216,7 @@ def case_mind(request, pk):
             'node_type': 'module',
             'is_smoke': False,
             'exec_result': '',
+            'collapsed': False,
             'title': c.case_name or '用例',
             'image': '',
             'children': [],
@@ -242,6 +243,7 @@ def _normalize_node(node):
         'node_type': node_type,
         'is_smoke': bool(node.get('is_smoke')),
         'exec_result': exec_result,
+        'collapsed': bool(node.get('collapsed')),
         'image': (node.get('image') or '').strip(),
         'children': children,
     }
@@ -259,6 +261,7 @@ def _replace_case_nodes(case_id, tree):
             node_type=node.get('node_type') or 'case',
             is_smoke=bool(node.get('is_smoke')),
             exec_result=node.get('exec_result') or '',
+            collapsed=bool(node.get('collapsed')),
             title=title,
             image=node.get('image') or '',
             sort_order=sort,
@@ -376,8 +379,8 @@ def _parse_data_url(data_url):
     return mime, raw
 
 
-# 冒烟用例按执行结果给节点文字上色：通过绿色、不通过红色（与前端 SVG 导出用色一致）
-EXEC_RESULT_COLOR = {'pass': '#67c23a', 'fail': '#f56c6c'}
+# 冒烟、执行结果对应的 XMind 标记图标（颜色语义：红旗=冒泡，绿勾=通过，红叉=不通过）
+MARKER_IDS = {'smoke': 'flag-red', 'pass': 'task-done', 'fail': 'symbol-wrong'}
 
 
 def _node_to_xmind_topic(node, image_srcs=None):
@@ -387,17 +390,6 @@ def _node_to_xmind_topic(node, image_srcs=None):
     """
     nid = node.get('id')
     title = node.get('title') or ''
-    # 冒烟、执行结果以标题后缀形式展示（可靠、任何 XMind 版本均可显示）
-    marks = []
-    if node.get('is_smoke'):
-        marks.append('冒烟')
-    exec_result = node.get('exec_result') or ''
-    if exec_result == 'pass':
-        marks.append('通过')
-    elif exec_result == 'fail':
-        marks.append('不通过')
-    if marks:
-        title = '%s【%s】' % (title, '·'.join(marks))
     topic = {
         'id': str(nid) if nid is not None else 'root',
         'class': 'topic',
@@ -405,12 +397,15 @@ def _node_to_xmind_topic(node, image_srcs=None):
         # 逻辑图（向右）：根在左、子节点向右单侧展开，与设计用例页面布局一致
         'structureClass': 'org.xmind.ui.logic.right',
     }
-    # 冒烟用例执行结果给节点文字上色：fo:color 控制 XMind 主题文字颜色
-    if node.get('is_smoke') and exec_result in EXEC_RESULT_COLOR:
-        topic['style'] = {
-            'id': 'style:%s' % topic['id'],
-            'properties': {'fo:color': EXEC_RESULT_COLOR[exec_result]},
-        }
+    # XMind 标题为单一颜色，无法分段着色；冒烟、执行结果以彩色标记图标展示
+    markers = []
+    if node.get('is_smoke'):
+        markers.append({'markerId': MARKER_IDS['smoke']})
+    exec_result = node.get('exec_result') or ''
+    if exec_result in ('pass', 'fail'):
+        markers.append({'markerId': MARKER_IDS[exec_result]})
+    if markers:
+        topic['markers'] = markers
     # 节点截图：作为 topic 的 image 引用（图片二进制已写入 zip 的 resources/ 目录）
     src = (image_srcs or {}).get(nid)
     if src:
@@ -434,7 +429,7 @@ def case_export_xmind(request, pk):
     rows = list(
         ZCaseGovernCaseNode.objects.filter(case_id=pk)
         .order_by('sort_order', 'id')
-        .values('id', 'parent_id', 'node_type', 'is_smoke', 'exec_result', 'title', 'image')
+        .values('id', 'parent_id', 'node_type', 'is_smoke', 'exec_result', 'collapsed', 'title', 'image')
     )
     roots = _build_tree(rows)
     if roots:

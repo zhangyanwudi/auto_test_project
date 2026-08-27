@@ -11,6 +11,7 @@
       v-else
       :case-id="caseId"
       :case-name="caseName"
+      expand-on-load
       @back="goHome"
       @saved="() => {}"
       @dirty-change="dirty = $event"

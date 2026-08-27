@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS `z_case_govern_case_node` (
     `node_type`     VARCHAR(32)     NOT NULL DEFAULT 'case'             COMMENT '节点类型：module-模块 case-用例 step-步骤 expect-预期 precondition-前置条件',
     `is_smoke`      TINYINT(1)      NOT NULL DEFAULT 0                  COMMENT '冒烟测试：1-冒烟用例，优先执行',
     `exec_result`   VARCHAR(16)     NOT NULL DEFAULT ''                 COMMENT '执行结果：pass-通过 fail-不通过 空-未执行',
+    `collapsed`     TINYINT(1)      NOT NULL DEFAULT 0                  COMMENT '收起子节点：1-收起 0-展开',
     `title`         VARCHAR(512)    NOT NULL                            COMMENT '节点文本',
     `image`         LONGTEXT        NULL                                COMMENT '图片（base64 data URL，粘贴）',
     `sort_order`    INT UNSIGNED    NOT NULL DEFAULT 0                  COMMENT '同级排序（越小越靠前）',
