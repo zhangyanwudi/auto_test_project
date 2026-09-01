@@ -1,7 +1,7 @@
 <template>
   <div class="mind-editor">
     <div class="mind-toolbar">
-      <el-button size="small" @click="onBack">返回列表</el-button>
+      <el-button v-if="showBack" size="small" @click="onBack">返回列表</el-button>
       <span class="mind-title">{{ caseName || '用例设计' }}</span>
       <div class="mind-toolbar-right">
         <span class="mind-legend">
@@ -153,6 +153,8 @@ const props = defineProps({
   readonly: { type: Boolean, default: false },
   // 只读场景（导出/分享）下加载后强制全部展开，仅前端展示，不写回数据库
   expandOnLoad: { type: Boolean, default: false },
+  // 是否显示工具栏「返回列表」按钮（分享页等用自定义关闭按钮替代）
+  showBack: { type: Boolean, default: true },
 })
 const emit = defineEmits(['saved', 'back', 'dirty-change', 'loaded'])
 

@@ -1,9 +1,13 @@
 <template>
-  <div class="case-share-page">
-    <div class="share-head">
-      <el-button size="small" @click="goHome">返回首页</el-button>
-      <span class="share-title">{{ caseName || '用例分享' }}</span>
-    </div>
+  <el-dialog
+    :model-value="true"
+    title="查看用例"
+    fullscreen
+    class="mind-dialog"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    @close="goHome"
+  >
     <div v-if="!caseId" class="share-tip">
       <el-empty description="未找到该用例" />
     </div>
@@ -11,12 +15,13 @@
       v-else
       :case-id="caseId"
       :case-name="caseName"
+      readonly
       expand-on-load
-      @back="goHome"
+      :show-back="false"
       @saved="() => {}"
       @dirty-change="dirty = $event"
     />
-  </div>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -76,31 +81,20 @@ onBeforeRouteLeave(async () => {
 </script>
 
 <style scoped>
-.case-share-page {
-  min-height: 100vh;
-  padding: 16px;
-  box-sizing: border-box;
-  background: #f0f2f5;
-}
-
-.share-head {
+:deep(.mind-dialog) {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  flex-direction: column;
 }
 
-.share-title {
-  font-weight: 600;
-  font-size: 16px;
-  color: #303133;
+:deep(.mind-dialog .el-dialog__body) {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .share-tip {
   padding: 40px 0;
-}
-
-.case-share-page :deep(.mind-editor) {
-  height: calc(100vh - 110px);
 }
 </style>
