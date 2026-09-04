@@ -16,6 +16,7 @@
         class="tcard-toggle"
         :title="node.collapsed ? `展开 ${childCount} 个子节点` : '收起子节点'"
         @click.stop="onToggleCollapse"
+        @dblclick.stop
       >
         <template v-if="node.collapsed">+{{ childCount }}</template>
         <template v-else>−</template>
@@ -43,6 +44,7 @@
         :class="`tcard-exec--${execResult}`"
         :title="execTitle"
         @click.stop="onToggleExec"
+        @dblclick.stop
       >
         <el-icon><component :is="execIcon" /></el-icon>
         <span>{{ execLabel }}</span>
@@ -58,7 +60,7 @@
         @dblclick.stop
       />
       <span v-if="!readonly" class="tcard-actions">
-        <el-icon v-if="!isRoot" class="tact tact--danger" title="删除节点" @click.stop="onRemove"><Delete /></el-icon>
+        <el-icon v-if="!isRoot" class="tact tact--danger" title="删除节点" @click.stop="onRemove" @dblclick.stop><Delete /></el-icon>
       </span>
     </div>
 
