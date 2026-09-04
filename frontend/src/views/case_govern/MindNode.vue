@@ -395,7 +395,7 @@ function onBlur() {
   font-size: 13px;
   color: #303133;
   white-space: pre-wrap;
-  line-height: 1.5;
+  line-height: 1.4;
   flex-shrink: 0;
 }
 
