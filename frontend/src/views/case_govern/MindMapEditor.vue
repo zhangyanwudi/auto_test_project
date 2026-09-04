@@ -54,7 +54,8 @@
             <el-input
               v-model="selectedNode.title"
               type="textarea"
-              :rows="2"
+              :rows="5"
+              class="node-title-input"
               placeholder="输入节点文本"
               :disabled="readonly"
               @input="onNodeEdit"
@@ -931,6 +932,10 @@ onUnmounted(() => {
 
 .panel-label:first-child {
   margin-top: 0;
+}
+
+.node-title-input :deep(.el-textarea__inner) {
+  height: 278px;
 }
 
 .panel-smoke {
