@@ -11,44 +11,49 @@
       @dragstart="onDragStart"
       @dragend="onDragEnd"
     >
-      <span
-        v-if="hasChildren"
-        class="tcard-toggle"
-        :title="node.collapsed ? `展开 ${childCount} 个子节点` : '收起子节点'"
-        @click.stop="onToggleCollapse"
-        @dblclick.stop
-      >
-        <template v-if="node.collapsed">+{{ childCount }}</template>
-        <template v-else>−</template>
-      </span>
-      <span class="tcard-tag">{{ typeLabel }}</span>
-      <span v-if="isSmokeCase" class="tcard-smoke" title="冒烟用例，优先执行">冒烟</span>
-      <input
-        v-if="isEditing"
-        ref="titleInput"
-        class="tcard-title-input"
-        :style="editWidth ? { width: editWidth + 'px' } : null"
-        :value="node.title"
-        placeholder="未命名"
-        @click.stop
-        @input="onTitleInput"
-        @keydown.tab.prevent="onTab"
-        @keydown.enter.prevent="onEnter"
-        @keydown.esc="onEsc"
-        @blur="onBlur"
-      />
-      <span v-else-if="node.title || !node.image" ref="titleRef" class="tcard-title">{{ wrappedTitle }}</span>
-      <span
-        v-if="node.node_type === 'case'"
-        class="tcard-exec"
-        :class="`tcard-exec--${execResult}`"
-        :title="execTitle"
-        @click.stop="onToggleExec"
-        @dblclick.stop
-      >
-        <el-icon><component :is="execIcon" /></el-icon>
-        <span>{{ execLabel }}</span>
-      </span>
+      <div class="tcard-row">
+        <span
+          v-if="hasChildren"
+          class="tcard-toggle"
+          :title="node.collapsed ? `展开 ${childCount} 个子节点` : '收起子节点'"
+          @click.stop="onToggleCollapse"
+          @dblclick.stop
+        >
+          <template v-if="node.collapsed">+{{ childCount }}</template>
+          <template v-else>−</template>
+        </span>
+        <span class="tcard-tag">{{ typeLabel }}</span>
+        <span v-if="isSmokeCase" class="tcard-smoke" title="冒烟用例，优先执行">冒烟</span>
+        <input
+          v-if="isEditing"
+          ref="titleInput"
+          class="tcard-title-input"
+          :style="editWidth ? { width: editWidth + 'px' } : null"
+          :value="node.title"
+          placeholder="未命名"
+          @click.stop
+          @input="onTitleInput"
+          @keydown.tab.prevent="onTab"
+          @keydown.enter.prevent="onEnter"
+          @keydown.esc="onEsc"
+          @blur="onBlur"
+        />
+        <span v-else-if="node.title || !node.image" ref="titleRef" class="tcard-title">{{ wrappedTitle }}</span>
+        <span
+          v-if="node.node_type === 'case'"
+          class="tcard-exec"
+          :class="`tcard-exec--${execResult}`"
+          :title="execTitle"
+          @click.stop="onToggleExec"
+          @dblclick.stop
+        >
+          <el-icon><component :is="execIcon" /></el-icon>
+          <span>{{ execLabel }}</span>
+        </span>
+        <span v-if="!readonly" class="tcard-actions">
+          <el-icon v-if="!isRoot" class="tact tact--danger" title="删除节点" @click.stop="onRemove" @dblclick.stop><Delete /></el-icon>
+        </span>
+      </div>
       <el-image
         v-if="node.image"
         :src="node.image"
@@ -59,9 +64,6 @@
         @click.stop
         @dblclick.stop
       />
-      <span v-if="!readonly" class="tcard-actions">
-        <el-icon v-if="!isRoot" class="tact tact--danger" title="删除节点" @click.stop="onRemove" @dblclick.stop><Delete /></el-icon>
-      </span>
     </div>
 
     <div v-if="hasChildren && !node.collapsed" class="tkids">
@@ -274,8 +276,8 @@ function onBlur() {
 
 .tcard {
   display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
   padding: 7px 12px;
   background: #fff;
@@ -287,6 +289,12 @@ function onBlur() {
   white-space: nowrap;
   flex-shrink: 0;
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tcard-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tcard:hover {
@@ -405,8 +413,7 @@ function onBlur() {
 }
 
 .tcard-img {
-  flex-basis: 100%;
-  max-width: 240px;
+  width: 240px;
   height: 160px;
   border-radius: 8px;
   border: 1px solid #ebeef5;
