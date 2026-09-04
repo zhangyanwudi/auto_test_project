@@ -275,6 +275,7 @@ function onBlur() {
 .tcard {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 7px 12px;
   background: #fff;
@@ -404,7 +405,8 @@ function onBlur() {
 }
 
 .tcard-img {
-  width: 240px;
+  flex-basis: 100%;
+  max-width: 240px;
   height: 160px;
   border-radius: 8px;
   border: 1px solid #ebeef5;
