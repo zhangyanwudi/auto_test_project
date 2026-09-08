@@ -8,7 +8,7 @@ class ZCaseGovernCase(models.Model):
     module = models.CharField('所属模块', max_length=128, blank=True, default='')
     priority = models.SmallIntegerField('优先级', default=2, help_text='1-高 2-中 3-低')
     status = models.SmallIntegerField('状态', default=1, help_text='1-启用 0-停用')
-    creator = models.CharField('创建人', max_length=64, blank=True, default='', help_text='登录用户')
+    creator = models.CharField('创建人', max_length=256, blank=True, default='', help_text='创建人（多个用英文逗号分隔，均有编辑/删除权限）')
     description = models.CharField('说明', max_length=512, blank=True, default='')
     image = models.TextField('图片', null=True, blank=True, default='', help_text='粘贴的图片（base64 data URL）')
     create_time = models.DateTimeField('创建时间', auto_now_add=True)

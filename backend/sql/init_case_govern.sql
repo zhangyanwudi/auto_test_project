@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `z_case_govern_case` (
     `module`        VARCHAR(128)    NOT NULL DEFAULT ''                 COMMENT '所属模块',
     `priority`      SMALLINT        NOT NULL DEFAULT 2                  COMMENT '优先级：1-高 2-中 3-低',
     `status`        SMALLINT        NOT NULL DEFAULT 1                  COMMENT '状态：1-启用 0-停用',
-    `creator`       VARCHAR(64)     NOT NULL DEFAULT ''                 COMMENT '创建人（登录用户）',
+    `creator`       VARCHAR(256)    NOT NULL DEFAULT ''                 COMMENT '创建人（多个用英文逗号分隔，均有编辑/删除权限）',
     `description`   VARCHAR(512)    NOT NULL DEFAULT ''                 COMMENT '说明',
     `image`         LONGTEXT        NULL                                COMMENT '图片（base64 data URL，粘贴）',
     `create_time`   DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',

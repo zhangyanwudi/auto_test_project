@@ -69,6 +69,48 @@ def _current_user_name(request):
     return (getattr(user, 'user_cn_name', '') or getattr(user, 'user_name', '') or '').strip()
 
 
+def _creator_names(creator_str):
+    """把创建人字符串按中英文逗号/分号拆分为去空名单（支持配置多个创建人）。"""
+    return [p for p in re.split(r'[,，;；]', creator_str or '') if p.strip()]
+
+
+def _normalize_creators(creator_str):
+    """规范化创建人字符串：拆分、去空、去重后以英文逗号拼接。"""
+    parts = []
+    for p in re.split(r'[,，;；]', creator_str or ''):
+        p = p.strip()
+        if p and p not in parts:
+            parts.append(p)
+    return ','.join(parts)
+
+
+def _current_user_names(request):
+    """当前用户可用于匹配创建人的身份名（中文名 + 登录名，去重去空）。"""
+    user = getattr(request, 'z_user', None)
+    if not user:
+        return []
+    names = []
+    for n in (getattr(user, 'user_cn_name', ''), getattr(user, 'user_name', '')):
+        n = (n or '').strip()
+        if n and n not in names:
+            names.append(n)
+    return names
+
+
+def _require_owner(request, case, action='编辑'):
+    """校验当前用户是否为创建人之一；通过返回 None，否则返回 403 响应。
+
+    创建人为空视为所有人可编辑（兼容历史数据）。
+    """
+    creators = _creator_names(case.creator)
+    if not creators:
+        return None
+    user_names = _current_user_names(request)
+    if any(n in creators for n in user_names):
+        return None
+    return JsonResponse({'code': 403, 'message': '仅创建人可%s该用例' % action}, status=403)
+
+
 def _ensure_module(module):
     """模块非空且模块表不存在时自动沉淀，供下次下拉选择。"""
     if not module:
@@ -100,7 +142,7 @@ def case_list(request):
 @require_http_methods(['POST'])
 @require_valid_token
 def case_create(request):
-    """新增用例记录（创建人取自登录用户；同一模块下用例名称唯一）。"""
+    """新增用例记录（创建人可配置多个，缺省为登录用户；同一模块下用例名称唯一）。"""
     body = _parse_body(request)
     if body is None:
         return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)
@@ -113,12 +155,13 @@ def case_create(request):
     priority = int(body.get('priority') if body.get('priority') is not None else 2)
     if priority not in (1, 2, 3):
         return JsonResponse({'code': 400, 'message': '优先级须为 1/2/3'}, status=400)
+    creator = _normalize_creators(body.get('creator') or '') or _current_user_name(request)
     c = ZCaseGovernCase.objects.create(
         case_name=case_name,
         module=module,
         priority=priority,
         status=int(body.get('status') if body.get('status') is not None else 1),
-        creator=_current_user_name(request),
+        creator=creator,
         description=(body.get('description') or '').strip(),
         image=(body.get('image') or '').strip(),
     )
@@ -130,7 +173,7 @@ def case_create(request):
 @require_http_methods(['PUT'])
 @require_valid_token
 def case_update(request, pk):
-    """编辑用例基本信息（创建人不随编辑变更；同一模块下用例名称唯一）。"""
+    """编辑用例基本信息（仅创建人可编辑，创建人可改配置；同一模块下用例名称唯一）。"""
     body = _parse_body(request)
     if body is None:
         return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)
@@ -138,6 +181,9 @@ def case_update(request, pk):
         c = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    err = _require_owner(request, c, '编辑')
+    if err:
+        return err
     case_name = (body.get('case_name') or '').strip()
     if not case_name:
         return JsonResponse({'code': 400, 'message': '用例名称不能为空'}, status=400)
@@ -147,6 +193,8 @@ def case_update(request, pk):
         return JsonResponse({'code': 400, 'message': '同一模块下已存在同名用例'}, status=400)
     c.case_name = case_name
     c.module = module
+    if 'creator' in body:
+        c.creator = _normalize_creators(body.get('creator') or '') or _current_user_name(request)
     if 'priority' in body:
         priority = int(body.get('priority') or 2)
         if priority not in (1, 2, 3):
@@ -167,11 +215,14 @@ def case_update(request, pk):
 @require_http_methods(['POST'])
 @require_valid_token
 def case_delete(request, pk):
-    """删除用例（级联删除思维导图节点）。"""
+    """删除用例（级联删除思维导图节点）；仅创建人可删除。"""
     try:
         c = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    err = _require_owner(request, c, '删除')
+    if err:
+        return err
     with transaction.atomic():
         c.nodes.all().delete()
         c.delete()
@@ -283,11 +334,10 @@ def case_mind_save(request, pk):
         case = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
-    # 仅创建人可编辑（非创建人只能查看）
-    creator = (case.creator or '').strip()
-    current_user = _current_user_name(request)
-    if creator and current_user and creator != current_user:
-        return JsonResponse({'code': 403, 'message': '仅创建人可编辑该用例'}, status=403)
+    # 仅创建人（可多个）可编辑（非创建人只能查看）
+    err = _require_owner(request, case, '编辑')
+    if err:
+        return err
     body = _parse_body(request)
     if body is None:
         return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)

@@ -56,16 +56,16 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="creator" label="创建人" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="creator" label="创建人" min-width="130" show-overflow-tooltip />
           <el-table-column prop="create_time" label="创建时间" min-width="170" show-overflow-tooltip />
           <el-table-column prop="update_time" label="更新时间" min-width="170" show-overflow-tooltip />
           <el-table-column label="操作" width="370" fixed="right">
             <template #default="{ row }">
               <el-button type="primary" size="small" @click="openMindEditor(row)">{{ isOwner(row) ? '设计用例' : '查看用例' }}</el-button>
-              <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
+              <el-button v-if="isOwner(row)" size="small" @click="openEditDialog(row)">编辑</el-button>
               <el-button size="small" type="warning" plain @click="onExport(row)">导出</el-button>
               <el-button size="small" type="success" plain @click="onShare(row)">分享</el-button>
-              <el-button type="danger" size="small" @click="onDelete(row)">删除</el-button>
+              <el-button v-if="isOwner(row)" type="danger" size="small" @click="onDelete(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -103,6 +103,9 @@
           >
             <el-option v-for="m in moduleOptions" :key="m" :label="m" :value="m" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="创建人" prop="creator">
+          <el-input v-model="form.creator" placeholder="多个创建人用逗号分隔，如：张一一,张二二" />
         </el-form-item>
         <el-form-item label="优先级" prop="priority">
           <el-radio-group v-model="form.priority">
@@ -199,11 +202,20 @@ const PRIORITY_LABELS = { 1: '高', 2: '中', 3: '低' }
 
 const showEmptyHint = computed(() => !loading.value && list.value.length === 0)
 
-/** 是否用例创建人（与后端 creator 取当前用户中文名/登录名一致）；无创建人记录时视为可编辑 */
+/** 拆分创建人字符串为去空名单（支持中英文逗号/分号分隔，与后端一致） */
+function splitCreators(raw) {
+  return String(raw || '')
+    .split(/[,，;；]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/** 是否用例创建人之一（匹配当前用户中文名/登录名）；无创建人记录时视为可编辑 */
 function isOwner(row) {
-  const creator = (row && row.creator || '').trim()
-  if (!creator) return true
-  return creator === getUserCnName() || creator === getUsername()
+  const creators = splitCreators(row && row.creator)
+  if (!creators.length) return true
+  const me = [getUserCnName(), getUsername()].filter(Boolean)
+  return creators.some((c) => me.includes(c))
 }
 
 function priorityLabel(v) {
@@ -238,6 +250,7 @@ const filteredList = computed(() => list.value.filter((row) => rowMatchesKeyword
 const form = reactive({
   case_name: '',
   module: '',
+  creator: '',
   priority: 2,
   status: 1,
   description: '',
@@ -252,6 +265,7 @@ function resetForm() {
   editingId.value = null
   form.case_name = ''
   form.module = ''
+  form.creator = ''
   form.priority = 2
   form.status = 1
   form.description = ''
@@ -266,6 +280,7 @@ function onDialogClosed() {
 function openCreateDialog() {
   editingId.value = null
   resetForm()
+  form.creator = getUserCnName()
   dialogVisible.value = true
 }
 
@@ -274,6 +289,7 @@ function openEditDialog(row) {
   editingId.value = row.id
   form.case_name = row.case_name
   form.module = row.module || ''
+  form.creator = row.creator || ''
   form.priority = row.priority || 2
   form.description = row.description || ''
   form.image = row.image || ''
@@ -385,6 +401,7 @@ async function submitForm() {
     const payload = {
       case_name: form.case_name.trim(),
       module: form.module.trim(),
+      creator: form.creator.trim(),
       priority: form.priority,
       description: form.description.trim(),
       image: form.image || '',
