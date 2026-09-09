@@ -92,17 +92,16 @@
           <el-input v-model="form.case_name" placeholder="同一模块下用例名称唯一" />
         </el-form-item>
         <el-form-item label="所属模块" prop="module">
-          <el-select
-            v-model="form.module"
+          <el-cascader
+            v-model="modulePath"
+            :options="moduleCascaderOptions"
+            :props="{ checkStrictly: true }"
             filterable
             clearable
-            allow-create
-            default-first-option
-            placeholder="选择或输入模块名"
+            separator="--"
+            placeholder="选择模块"
             style="width: 100%"
-          >
-            <el-option v-for="m in moduleOptions" :key="m" :label="m" :value="m" />
-          </el-select>
+          />
         </el-form-item>
         <el-form-item label="创建人" prop="creator">
           <el-input v-model="form.creator" placeholder="多个创建人用逗号分隔，如：张一一,张二二" />
@@ -194,12 +193,23 @@ const formRef = ref(null)
 const mindVisible = ref(false)
 const mindCase = ref(null)
 const mindDirty = ref(false)
-// 模块下拉选项：在此列表变量中配置，修改用例选择模块时即展示这些项
-const moduleOptions = ref(['其它', '达人基建'])
+// 模块配置（树型结构）：键为一级模块，值为其子模块列表；子模块为空数组表示仅可选择一级模块。
+// 在页面选择模块时，先展示一级模块，点击后再展开其子模块，最终按「一级模块--子模块」显示。
+const moduleConfig = {
+  达人基建: ['订单', '合同','结算明细','视频','投流'],
+  其他: ['业务'],
+}
 const importInput = ref(null)
 const importing = ref(false)
 
 const PRIORITY_LABELS = { 1: '高', 2: '中', 3: '低' }
+
+/** 将 moduleConfig 树型配置转为 el-cascader 的 options */
+const moduleCascaderOptions = Object.entries(moduleConfig).map(([group, children]) => ({
+  value: group,
+  label: group,
+  children: (children || []).map((sub) => ({ value: sub, label: sub })),
+}))
 
 const showEmptyHint = computed(() => !loading.value && list.value.length === 0)
 
@@ -250,7 +260,6 @@ const filteredList = computed(() => list.value.filter((row) => rowMatchesKeyword
 
 const form = reactive({
   case_name: '',
-  module: '',
   creator: '',
   priority: 2,
   status: 1,
@@ -262,15 +271,27 @@ const rules = {
   case_name: [{ required: true, message: '请输入用例名称', trigger: 'blur' }],
 }
 
+/** 编辑时级联选择器选中的路径（如 ['达人基建', '订单']） */
+const modulePath = ref([])
+
+/** 根据保存的模块字符串反解出级联路径（回显编辑框用） */
+function moduleToPath(module) {
+  const m = (module || '').trim()
+  if (!m) return []
+  const idx = m.indexOf('--')
+  if (idx === -1) return [m]
+  return [m.slice(0, idx), m.slice(idx + 2)]
+}
+
 function resetForm() {
   editingId.value = null
   form.case_name = ''
-  form.module = ''
   form.creator = ''
   form.priority = 2
   form.status = 1
   form.description = ''
   form.image = ''
+  modulePath.value = []
 }
 
 function onDialogClosed() {
@@ -289,11 +310,11 @@ function openEditDialog(row) {
   resetForm()
   editingId.value = row.id
   form.case_name = row.case_name
-  form.module = row.module || ''
   form.creator = row.creator || ''
   form.priority = row.priority || 2
   form.description = row.description || ''
   form.image = row.image || ''
+  modulePath.value = moduleToPath(row.module)
   dialogVisible.value = true
 }
 
@@ -359,8 +380,6 @@ async function loadList() {
   }
 }
 
-/** 已用页面顶部 moduleOptions 列表变量配置模块，不再调用后端模块接口 */
-
 function onCasePaste(e) {
   const items = e.clipboardData?.items
   if (!items) return
@@ -390,7 +409,7 @@ async function submitForm() {
   try {
     const payload = {
       case_name: form.case_name.trim(),
-      module: form.module.trim(),
+      module: (modulePath.value || []).join('--').trim(),
       creator: form.creator.trim(),
       priority: form.priority,
       description: form.description.trim(),
