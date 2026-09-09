@@ -11,7 +11,7 @@ const routes = [
   { path: '/', name: 'Login', component: Login },
   { path: '/login', redirect: '/' },
   { path: '/home', name: 'Home', component: Home, meta: { requiresAuth: true } },
-  { path: '/case_share/:id', name: 'CaseShare', component: CaseShare, meta: { requiresAuth: true } },
+  { path: '/case_share/:token', name: 'CaseShare', component: CaseShare, meta: { requiresAuth: true } },
   { path: '/case_export/:id', name: 'CaseExport', component: CaseExport, meta: { requiresAuth: true } },
 ]
 

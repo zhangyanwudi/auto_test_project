@@ -9,6 +9,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from urllib.parse import quote
 
+from django.core import signing
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
@@ -34,6 +35,30 @@ def _fmt_dt(dt):
     if not dt:
         return None
     return timezone.localtime(dt).strftime('%Y-%m-%d %H:%M:%S')
+
+
+SHARE_SALT = 'case_govern.share'
+# 分享链接有效期（秒），0 表示永久有效
+SHARE_MAX_AGE = 7 * 24 * 3600
+
+
+def make_share_token(case_id):
+    """根据用例 id 生成分享 token（HMAC 签名、带时间戳，URL 安全）。"""
+    return signing.dumps({'case_id': case_id}, salt=SHARE_SALT)
+
+
+def parse_share_token(token):
+    """校验分享 token，返回 case_id；无效/过期返回 None。"""
+    try:
+        data = signing.loads(token, salt=SHARE_SALT, max_age=SHARE_MAX_AGE)
+    except Exception:
+        return None
+    case_id = data.get('case_id') if isinstance(data, dict) else None
+    try:
+        case_id = int(case_id)
+    except (TypeError, ValueError):
+        return None
+    return case_id if case_id > 0 else None
 
 
 def _serialize_case(c, node_count=None):
@@ -136,6 +161,34 @@ def case_list(request):
     """用例列表（按 id 倒序），附带节点数统计。"""
     qs = ZCaseGovernCase.objects.annotate(node_count=Count('nodes')).order_by('-id')
     return JsonResponse({'code': 0, 'data': [_serialize_case(c, c.node_count) for c in qs]})
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+@require_valid_token
+def case_share_token(request, pk):
+    """生成用例分享链接 token（HMAC 签名，URL 不可预测、不可篡改）。"""
+    try:
+        ZCaseGovernCase.objects.get(pk=pk)
+    except ZCaseGovernCase.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    return JsonResponse({'code': 0, 'data': {'token': make_share_token(pk)}})
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+@require_valid_token
+def case_share_verify(request):
+    """校验分享 token 并返回用例概要信息（供前端分享页加载）。"""
+    token = (request.GET.get('token') or '').strip()
+    case_id = parse_share_token(token)
+    if not case_id:
+        return JsonResponse({'code': 400, 'message': '分享链接无效或已过期'}, status=400)
+    try:
+        c = ZCaseGovernCase.objects.get(pk=case_id)
+    except ZCaseGovernCase.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    return JsonResponse({'code': 0, 'data': {'case_id': c.id, 'case_name': c.case_name}})
 
 
 @csrf_exempt

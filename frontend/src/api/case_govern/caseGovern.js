@@ -37,6 +37,18 @@ export async function deleteCase(id) {
   return res.json()
 }
 
+/** 生成用例分享链接 token（后端签名，URL 不可预测） */
+export async function fetchShareToken(id) {
+  const res = await requestWithToken(`${BASE}/cases/${id}/share_token/`)
+  return res.json()
+}
+
+/** 校验分享 token，返回 { case_id, case_name } */
+export async function verifyShareToken(token) {
+  const res = await requestWithToken(`${BASE}/cases/share_verify/?token=${encodeURIComponent(token)}`)
+  return res.json()
+}
+
 /** 获取用例的思维导图树 */
 export async function fetchMindTree(id) {
   const res = await requestWithToken(`${BASE}/cases/${id}/mind/`)

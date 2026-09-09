@@ -8,8 +8,11 @@
     :close-on-press-escape="false"
     @close="goHome"
   >
-    <div v-if="!caseId" class="share-tip">
-      <el-empty description="未找到该用例" />
+    <div v-if="loading" class="share-tip" v-loading="loading">
+      <el-empty description="正在校验分享链接…" />
+    </div>
+    <div v-else-if="!caseId" class="share-tip">
+      <el-empty :description="errorMsg || '分享链接无效或已过期'" />
     </div>
     <MindMapEditor
       v-else
@@ -28,7 +31,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { fetchCaseList } from '../../api/case_govern/caseGovern.js'
+import { verifyShareToken } from '../../api/case_govern/caseGovern.js'
 import MindMapEditor from './MindMapEditor.vue'
 
 const route = useRoute()
@@ -36,22 +39,28 @@ const router = useRouter()
 const caseId = ref(null)
 const caseName = ref('')
 const dirty = ref(false)
+const loading = ref(false)
+const errorMsg = ref('')
 
-function parseId() {
-  const raw = Number(route.params.id)
-  caseId.value = Number.isFinite(raw) && raw > 0 ? raw : null
-}
-
-async function loadName() {
-  if (!caseId.value) return
+async function loadByToken() {
+  const token = (route.params.token || '').trim()
+  if (!token) {
+    errorMsg.value = '分享链接无效'
+    return
+  }
+  loading.value = true
   try {
-    const res = await fetchCaseList()
-    if (res.code === 0 && Array.isArray(res.data)) {
-      const found = res.data.find((c) => c.id === caseId.value)
-      if (found) caseName.value = found.case_name || ''
+    const res = await verifyShareToken(token)
+    if (res.code === 0 && res.data) {
+      caseId.value = res.data.case_id
+      caseName.value = res.data.case_name || ''
+    } else {
+      errorMsg.value = res.message || '分享链接无效或已过期'
     }
-  } catch {
-    // 静默失败
+  } catch (e) {
+    errorMsg.value = e.message || '分享链接无效或已过期'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -60,8 +69,7 @@ function goHome() {
 }
 
 onMounted(() => {
-  parseId()
-  loadName()
+  loadByToken()
 })
 
 // 拦截浏览器后退（Mac 左右滑动）等路由离开，未保存修改时先确认

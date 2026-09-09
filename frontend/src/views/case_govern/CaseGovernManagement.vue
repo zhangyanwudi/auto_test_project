@@ -175,11 +175,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import {
   fetchCaseList,
-  fetchModuleList,
   createCase,
   updateCase,
   deleteCase,
   importCaseFromFile,
+  fetchShareToken,
 } from '../../api/case_govern/caseGovern.js'
 import { getUserCnName, getUsername } from '../../common/request.js'
 import MindMapEditor from './MindMapEditor.vue'
@@ -194,7 +194,8 @@ const formRef = ref(null)
 const mindVisible = ref(false)
 const mindCase = ref(null)
 const mindDirty = ref(false)
-const moduleOptions = ref([])
+// 模块下拉选项：在此列表变量中配置，修改用例选择模块时即展示这些项
+const moduleOptions = ref(['其它', '达人基建'])
 const importInput = ref(null)
 const importing = ref(false)
 
@@ -358,18 +359,7 @@ async function loadList() {
   }
 }
 
-async function loadModules() {
-  try {
-    const res = await fetchModuleList()
-    if (res.code === 0 && Array.isArray(res.data)) {
-      moduleOptions.value = res.data.map((x) => String(x))
-    } else {
-      moduleOptions.value = []
-    }
-  } catch {
-    moduleOptions.value = []
-  }
-}
+/** 已用页面顶部 moduleOptions 列表变量配置模块，不再调用后端模块接口 */
 
 function onCasePaste(e) {
   const items = e.clipboardData?.items
@@ -416,7 +406,6 @@ async function submitForm() {
       ElMessage.success(res.message || '保存成功')
       dialogVisible.value = false
       await loadList()
-      await loadModules()
       if (!editingId.value) {
         // 新建成功后直接进入思维导图设计
         const created = res.data || {}
@@ -459,12 +448,21 @@ function copyText(text) {
 }
 
 async function onShare(row) {
-  const url = `${window.location.origin}/case_share/${row.id}`
   try {
-    await copyText(url)
-    ElMessage.success('分享链接已复制到剪贴板')
-  } catch {
-    ElMessage.error(`复制失败，请手动复制：${url}`)
+    const res = await fetchShareToken(row.id)
+    if (res.code !== 0 || !res.data || !res.data.token) {
+      ElMessage.error(res.message || '生成分享链接失败')
+      return
+    }
+    const url = `${window.location.origin}/case_share/${res.data.token}`
+    try {
+      await copyText(url)
+      ElMessage.success('分享链接已复制到剪贴板（7 天内有效）')
+    } catch {
+      ElMessage.error(`复制失败，请手动复制：${url}`)
+    }
+  } catch (e) {
+    ElMessage.error(e.message || '生成分享链接失败')
   }
 }
 
@@ -510,7 +508,6 @@ async function onImportFileChange(e) {
     if (res.code === 0) {
       ElMessage.success(res.message || '导入成功')
       await loadList()
-      await loadModules()
       // 导入成功后直接进入思维导图设计，便于查看导入结果
       const created = res.data || {}
       if (created.id) {
@@ -530,7 +527,6 @@ async function onImportFileChange(e) {
 
 onMounted(() => {
   loadList()
-  loadModules()
 })
 
 // 供 Home 的路由离开守卫调用：判断当前是否有未保存的思维导图修改

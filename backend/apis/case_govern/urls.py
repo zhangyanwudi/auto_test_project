@@ -7,6 +7,8 @@ urlpatterns = [
     path('cases/create/', views.case_create),
     path('cases/import/', views.case_import),
     path('cases/import_emmx/', views.case_import_emmx),
+    path('cases/<int:pk>/share_token/', views.case_share_token),
+    path('cases/share_verify/', views.case_share_verify),
     path('cases/<int:pk>/mind/', views.case_mind),
     path('cases/<int:pk>/mind/save/', views.case_mind_save),
     path('cases/<int:pk>/mind/exec/', views.case_node_exec),
