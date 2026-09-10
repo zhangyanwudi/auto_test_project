@@ -22,7 +22,7 @@ from apps.users.decorators import require_valid_token
 
 logger = logging.getLogger('apis.case_govern')
 
-NODE_TYPES = ('module', 'case', 'step', 'expect', 'precondition')
+NODE_TYPES = ('module', 'case', 'step', 'expect', 'precondition', 'result')
 PRIORITY_MAP = {1: '高', 2: '中', 3: '低'}
 # 导入 .emmx / .xmind 时按层级映射节点类型：0-根主题(模块)，其余层级统一映射为用例
 IMPORT_DEPTH_TYPE = {0: 'module'}

@@ -42,8 +42,8 @@ const caseName = ref('')
 const updateTime = ref('')
 const exporting = ref(false)
 
-const TYPE_LABELS = { module: '模块', case: '用例', step: '步骤', expect: '预期', precondition: '前置条件' }
-const TYPE_COLORS = { module: '#409eff', case: '#67c23a', step: '#909399', expect: '#e6a23c', precondition: '#b882ff' }
+const TYPE_LABELS = { module: '模块', case: '用例', step: '步骤', expect: '预期', precondition: '前置条件', result: '结果' }
+const TYPE_COLORS = { module: '#409eff', case: '#67c23a', step: '#909399', expect: '#e6a23c', precondition: '#b882ff', result: '#13c2c2' }
 const EXEC_COLORS = { '通过': '#67c23a', '不通过': '#f56c6c', '未执行': '#909399' }
 
 function parseId() {

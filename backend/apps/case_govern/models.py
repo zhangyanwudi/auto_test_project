@@ -48,7 +48,7 @@ class ZCaseGovernCaseNode(models.Model):
     )
     node_type = models.CharField(
         '节点类型', max_length=32, default='case',
-        help_text='module-模块 case-用例 step-步骤 expect-预期 precondition-前置条件',
+        help_text='module-模块 case-用例 step-步骤 expect-预期 precondition-前置条件 result-结果',
     )
     is_smoke = models.BooleanField(
         '冒烟测试', default=False,

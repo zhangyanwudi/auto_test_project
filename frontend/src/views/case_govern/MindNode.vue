@@ -104,6 +104,7 @@ const TYPE_META = {
   step: { label: '步骤', color: '#909399' },
   expect: { label: '预期', color: '#e6a23c' },
   precondition: { label: '前置条件', color: '#b882ff' },
+  result: { label: '结果', color: '#13c2c2' },
 }
 
 const typeLabel = computed(() => (TYPE_META[props.node.node_type] || TYPE_META.case).label)
@@ -358,6 +359,7 @@ function onBlur() {
 .tcard--step .tcard-tag { background: #909399; }
 .tcard--expect .tcard-tag { background: #e6a23c; }
 .tcard--precondition .tcard-tag { background: #b882ff; }
+.tcard--result .tcard-tag { background: #13c2c2; }
 
 .tcard-smoke {
   font-size: 11px;

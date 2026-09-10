@@ -146,6 +146,7 @@ const NODE_TYPES = [
   { value: 'step', label: '步骤', color: '#909399' },
   { value: 'expect', label: '预期', color: '#e6a23c' },
   { value: 'precondition', label: '前置条件', color: '#b882ff' },
+  { value: 'result', label: '结果', color: '#13c2c2' },
 ]
 
 const props = defineProps({
