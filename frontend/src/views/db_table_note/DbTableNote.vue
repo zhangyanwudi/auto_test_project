@@ -99,6 +99,7 @@
                     size="small"
                     class="field-input"
                     :placeholder="row.comment || '补充备注'"
+                    @input="onFieldInput(t)"
                   />
                 </div>
               </div>
@@ -238,6 +239,12 @@ const noteForm = reactive({
   note: '',
   sqlRecords: '',
 })
+
+// 已保存快照：切换表/连接前对比，有未保存改动则自动落库
+const savedSqlSnapshot = ref('')
+const savedFieldNotesSnapshot = ref('')
+// 记录哪些表字段有未保存的手动改动
+const dirtyFields = ref({})  // { table_name: true }
 
 /* ---- 表备注弹窗 ---- */
 const noteDialogVisible = ref(false)
@@ -405,7 +412,9 @@ async function loadTables() {
   }
 }
 
-function onConnChange() {
+async function onConnChange() {
+  // 切换连接前，先把当前表未保存的 SQL / 字段备注落库
+  await autoSaveCurrent()
   currentTable.value = ''
   currentTableComment.value = ''
   noteForm.note = ''
@@ -413,6 +422,9 @@ function onConnChange() {
   fieldsMap.value = {}
   fieldsExpanded.value = {}
   fieldsLoadingMap.value = {}
+  dirtyFields.value = {}
+  savedSqlSnapshot.value = ''
+  savedFieldNotesSnapshot.value = ''
   loadTables()
 }
 
@@ -420,7 +432,10 @@ function onTableSearch() {
   loadTables()
 }
 
-function selectTable(t) {
+async function selectTable(t) {
+  if (t.table_name === currentTable.value) return
+  // 切换表前，先把上一张表未保存的 SQL / 字段备注落库
+  await autoSaveCurrent()
   currentTable.value = t.table_name
   currentTableComment.value = t.comment || ''
   loadNote(t.table_name)
@@ -463,16 +478,60 @@ async function loadFieldsForTable(tableName) {
   }
 }
 
+/** 组装某表的字段手动备注为 {字段名: 备注}，仅保留非空项 */
+function buildFieldNotesFor(tableName) {
+  const map = {}
+  for (const f of fieldsMap.value[tableName] || []) {
+    const manual = (f.manual || '').trim()
+    if (manual) map[f.name] = manual
+  }
+  return map
+}
+
+/** 字段手动输入时标记该表有未保存改动 */
+function onFieldInput(t) {
+  dirtyFields.value[t.table_name] = true
+}
+
+/**
+ * 切换表/连接前，自动保存当前表未保存的内容：
+ * - 右侧 SQL 输入框与快照不一致时保存 sql_records
+ * - 字段有手动改动时保存 field_notes
+ */
+async function autoSaveCurrent() {
+  if (!currentConnId.value || !currentTable.value) return
+  const sqlDirty = noteForm.sqlRecords !== savedSqlSnapshot.value
+  const fieldDirty = !!dirtyFields.value[currentTable.value]
+
+  if (!sqlDirty && !fieldDirty) return
+
+  noteSaving.value = true
+  try {
+    const payload = { connection_id: currentConnId.value, table_name: currentTable.value }
+    if (sqlDirty) payload.sql_records = noteForm.sqlRecords
+    if (fieldDirty) payload.field_notes = buildFieldNotesFor(currentTable.value)
+
+    const res = await saveTableNote(payload)
+    if (res.code === 0) {
+      savedSqlSnapshot.value = noteForm.sqlRecords
+      savedFieldNotesSnapshot.value = JSON.stringify(buildFieldNotesFor(currentTable.value))
+      delete dirtyFields.value[currentTable.value]
+    } else {
+      ElMessage.error(res.message || '自动保存失败')
+    }
+  } catch (e) {
+    ElMessage.error(e.message || '自动保存失败')
+  } finally {
+    noteSaving.value = false
+  }
+}
+
 /** 只保存某表的字段手动备注（不碰 note / sql_records） */
 async function saveFieldNotes(t) {
   if (!currentConnId.value) return
   noteSaving.value = true
   try {
-    const map = {}
-    for (const f of fieldsMap.value[t.table_name] || []) {
-      const manual = (f.manual || '').trim()
-      if (manual) map[f.name] = manual
-    }
+    const map = buildFieldNotesFor(t.table_name)
     const res = await saveTableNote({
       connection_id: currentConnId.value,
       table_name: t.table_name,
@@ -480,6 +539,8 @@ async function saveFieldNotes(t) {
     })
     if (res.code === 0) {
       ElMessage.success('字段备注已保存')
+      delete dirtyFields.value[t.table_name]
+      savedFieldNotesSnapshot.value = JSON.stringify(map)
       await loadTables()
     } else {
       ElMessage.error(res.message || '保存失败')
@@ -504,6 +565,8 @@ async function loadNote(tableName) {
     noteForm.note = ''
     noteForm.sqlRecords = ''
   }
+  // 同步快照，作为「未保存改动」的基准
+  savedSqlSnapshot.value = noteForm.sqlRecords
 }
 
 async function reloadNote() {
@@ -674,6 +737,7 @@ async function saveSqlRecords() {
     })
     if (res.code === 0) {
       ElMessage.success('SQL 已保存')
+      savedSqlSnapshot.value = noteForm.sqlRecords
     } else {
       ElMessage.error(res.message || '保存失败')
     }
