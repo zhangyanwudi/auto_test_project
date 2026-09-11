@@ -369,3 +369,96 @@ def note_save(request):
         },
     )
     return JsonResponse({'code': 0, 'message': '保存成功', 'data': _table_note_public(m)})
+
+
+# 执行 SQL 的最大返回行数（防止大结果撑爆内存/响应）
+MAX_QUERY_ROWS = 500
+# 允许执行的查询类语句
+_QUERY_KEYWORDS = ('SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN')
+# 允许执行的写操作语句（无 WHERE 时需前端确认后携带 force=true）
+_WRITE_KEYWORDS = ('UPDATE', 'DELETE')
+
+
+def _strip_sql_noise(sql):
+    """去除 SQL 中的注释与字符串，仅保留结构，用于关键字 / WHERE 判断。"""
+    s = re.sub(r"--[^\n]*", ' ', sql)
+    s = re.sub(r"/\*.*?\*/", ' ', s, flags=re.S)
+    s = re.sub(r"'(?:[^'\\]|\\.)*'", ' ', s)
+    s = re.sub(r'"(?:[^"\\]|\\.)*"', ' ', s)
+    return s
+
+
+def _has_where(sql):
+    """判断 SQL 是否含 WHERE 条件（排除注释与字符串内的 where）。"""
+    return bool(re.search(r'\bWHERE\b', _strip_sql_noise(sql), re.IGNORECASE))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@require_valid_token
+def sql_execute(request):
+    """执行 SQL 并返回结果。
+
+    - 查询类（SELECT/SHOW/DESCRIBE/EXPLAIN）：返回 { columns, rows, row_count, truncated }。
+    - 写操作（UPDATE/DELETE）：返回 { is_write, affected }；
+      若无 WHERE 条件，必须携带 force=true（前端已让用户确认）否则拒绝。
+
+    body: { connection_id, sql, force? }
+    """
+    body = _parse_body(request)
+    if body is None:
+        return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)
+    conn_id = (body.get('connection_id') or '').strip()
+    sql = (body.get('sql') or '').strip()
+    if not conn_id or not sql:
+        return JsonResponse({'code': 400, 'message': '缺少 connection_id 或 sql'}, status=400)
+    cfg = _connection_by_id(conn_id)
+    if not cfg:
+        return JsonResponse({'code': 404, 'message': '连接配置不存在'}, status=404)
+
+    stripped = _strip_sql_noise(sql)
+    first_word = (stripped.strip().split(None, 1) or [''])[0].upper()
+    if first_word not in _QUERY_KEYWORDS + _WRITE_KEYWORDS:
+        return JsonResponse(
+            {'code': 400, 'message': '仅支持 SELECT/SHOW/DESCRIBE/EXPLAIN 查询及 UPDATE/DELETE 操作'},
+            status=400,
+        )
+
+    is_write = first_word in _WRITE_KEYWORDS
+    force = body.get('force') in (True, 'true', '1', 1)
+    if is_write and not _has_where(sql) and not force:
+        return JsonResponse(
+            {'code': 400, 'message': '该语句没有 WHERE 条件，将影响全表数据，请确认后再执行'},
+            status=400,
+        )
+
+    conn = None
+    try:
+        conn = _open_conn(cfg)
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            if is_write:
+                affected = cur.rowcount
+                return JsonResponse({'code': 0, 'data': {'is_write': True, 'affected': affected}})
+            rows = cur.fetchall()
+            columns = [d[0] for d in cur.description or []]
+            if len(rows) > MAX_QUERY_ROWS:
+                rows = rows[:MAX_QUERY_ROWS]
+                truncated = True
+            else:
+                truncated = False
+        # 结果统一转字符串，避免 JSON 序列化 datetime/Decimal 报错
+        data_rows = [[None if v is None else str(v) for v in row] for row in rows]
+        return JsonResponse({
+            'code': 0,
+            'data': {'columns': columns, 'rows': data_rows, 'row_count': len(data_rows), 'truncated': truncated},
+        })
+    except Exception as e:
+        logger.exception('执行 SQL 失败: %s', conn_id)
+        return JsonResponse({'code': 500, 'message': '执行失败：%s' % e}, status=500)
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass

@@ -9,4 +9,5 @@ urlpatterns = [
     path('fields/', views.table_fields),
     path('note/', views.note_get),
     path('note/save/', views.note_save),
+    path('sql/execute/', views.sql_execute),
 ]

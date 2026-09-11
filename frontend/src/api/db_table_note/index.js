@@ -58,3 +58,12 @@ export async function saveTableNote(body) {
   })
   return res.json()
 }
+
+/** 执行 SQL（查询返回结果集；UPDATE/DELETE 无 WHERE 时需 force=true） */
+export async function executeSql(connectionId, sql, force = false) {
+  const res = await requestWithToken(`${BASE}/sql/execute/`, {
+    method: 'POST',
+    body: JSON.stringify({ connection_id: connectionId, sql, force }),
+  })
+  return res.json()
+}

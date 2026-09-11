@@ -1,12 +1,6 @@
 <template>
   <div class="db-table-note-page">
     <el-card shadow="never">
-      <template #header>
-        <header class="card-head">
-          <span class="card-title">数据库表备注</span>
-        </header>
-      </template>
-
       <div class="layout">
         <!-- 左侧：连接 + 表列表（表项可内联展开字段） -->
         <div class="left-panel">
@@ -139,6 +133,59 @@
                 @blur="onSqlBlur"
               ></textarea>
             </div>
+
+            <div class="sql-actions">
+              <el-button
+                size="small"
+                type="primary"
+                :loading="executing"
+                :disabled="!noteForm.sqlRecords.trim()"
+                @click="runSql"
+              >
+                执行 SQL
+              </el-button>
+              <el-button size="small" :loading="executing" @click="clearResult">清空结果</el-button>
+            </div>
+
+            <!-- 执行结果 -->
+            <div v-if="result" class="sql-result">
+              <div class="result-head">
+                <span class="result-title">执行结果</span>
+                <span v-if="result.is_write" class="result-meta">
+                  影响 {{ result.affected }} 行
+                </span>
+                <span v-else class="result-meta">
+                  共 {{ result.row_count }} 行{{ result.truncated ? '（已截断，最多显示 ' + maxRows + ' 行）' : '' }}
+                </span>
+              </div>
+              <el-alert
+                v-if="result.is_write"
+                :title="'执行成功，影响 ' + result.affected + ' 行'"
+                type="success"
+                :closable="false"
+                show-icon
+              />
+              <template v-else>
+                <el-table
+                  v-if="result.columns && result.columns.length"
+                  :data="result.rows"
+                  size="small"
+                  border
+                  max-height="360"
+                  empty-text="查询无数据"
+                >
+                  <el-table-column
+                    v-for="(col, idx) in result.columns"
+                    :key="idx"
+                    :prop="String(idx)"
+                    :label="col"
+                    min-width="120"
+                    show-overflow-tooltip
+                  />
+                </el-table>
+                <el-empty v-else description="无返回结果" :image-size="60" />
+              </template>
+            </div>
           </template>
         </div>
       </div>
@@ -220,6 +267,7 @@ import {
   fetchTableNote,
   fetchTableFields,
   saveTableNote,
+  executeSql,
 } from '../../api/db_table_note/index.js'
 
 const connections = ref([])
@@ -230,6 +278,11 @@ const tableLoading = ref(false)
 const currentTable = ref('')
 const currentTableComment = ref('')
 const noteSaving = ref(false)
+
+/* ---- 执行 SQL ---- */
+const executing = ref(false)
+const result = ref(null)   // { columns: [...], rows: [[...]], row_count, truncated }
+const maxRows = 500        // 与后端 MAX_QUERY_ROWS 一致，仅用于提示文案
 
 const currentConn = computed(() =>
   connections.value.find((c) => c.id === currentConnId.value)
@@ -425,6 +478,7 @@ async function onConnChange() {
   dirtyFields.value = {}
   savedSqlSnapshot.value = ''
   savedFieldNotesSnapshot.value = ''
+  clearResult()
   loadTables()
 }
 
@@ -438,6 +492,7 @@ async function selectTable(t) {
   await autoSaveCurrent()
   currentTable.value = t.table_name
   currentTableComment.value = t.comment || ''
+  clearResult()
   loadNote(t.table_name)
 }
 
@@ -745,6 +800,87 @@ async function saveSqlRecords() {
   }
 }
 
+/** 从 textarea 取「选中的 SQL」，无选中则返回整段内容 */
+function getSelectedSql() {
+  const ta = sqlTextareaRef.value
+  if (!ta) return (noteForm.sqlRecords || '').trim()
+  const s = ta.selectionStart
+  const e = ta.selectionEnd
+  if (s === e) return (noteForm.sqlRecords || '').trim()
+  return (noteForm.sqlRecords || '').slice(s, e).trim()
+}
+
+/** 判断 SQL 是否为写操作（UPDATE/DELETE），并检测有无 WHERE */
+function isWriteSql(sql) {
+  const stripped = sql
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/'(?:[^'\\]|\\.)*'/g, ' ')
+    .replace(/"(?:[^"\\]|\\.)*"/g, ' ')
+  const first = (stripped.trim().split(/\s+/, 1) || [''])[0].toUpperCase()
+  if (first !== 'UPDATE' && first !== 'DELETE') return false
+  return !/\bWHERE\b/i.test(stripped)
+}
+
+/** 执行 SQL：优先执行选中的 SQL；写操作无 WHERE 时确认后再执行 */
+async function runSql() {
+  if (!currentConnId.value) return
+  const sql = getSelectedSql()
+  if (!sql) {
+    ElMessage.warning('请输入或选中要执行的 SQL')
+    return
+  }
+
+  let force = false
+  if (isWriteSql(sql)) {
+    try {
+      await ElMessageBox.confirm(
+        '该语句没有 WHERE 条件，将影响全表数据，是否继续执行？',
+        '危险操作确认',
+        {
+          type: 'warning',
+          confirmButtonText: '仍要执行',
+          cancelButtonText: '取消',
+          confirmButtonClass: 'el-button--danger',
+        },
+      )
+      force = true
+    } catch {
+      return
+    }
+  }
+
+  executing.value = true
+  try {
+    const res = await executeSql(currentConnId.value, sql, force)
+    if (res.code === 0 && res.data) {
+      if (res.data.is_write) {
+        // 写操作：无结果集，展示影响行数
+        result.value = {
+          columns: [],
+          rows: [],
+          row_count: res.data.affected,
+          truncated: false,
+          is_write: true,
+          affected: res.data.affected,
+        }
+      } else {
+        result.value = res.data
+      }
+    } else {
+      ElMessage.error(res.message || '执行失败')
+    }
+  } catch (e) {
+    ElMessage.error(e.message || '执行失败')
+  } finally {
+    executing.value = false
+  }
+}
+
+function clearResult() {
+  result.value = null
+}
+
 onMounted(async () => {
   await loadConnections()
   if (connections.value.length) {
@@ -757,17 +893,6 @@ onMounted(async () => {
 <style scoped>
 .db-table-note-page {
   width: 100%;
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.card-title {
-  font-weight: 600;
-  font-size: 15px;
 }
 
 .layout {
@@ -1078,5 +1203,34 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--el-color-primary);
   margin-bottom: 10px;
+}
+
+.sql-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sql-result {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.result-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.result-meta {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>
