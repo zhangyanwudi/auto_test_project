@@ -626,22 +626,19 @@ const sqlTextareaRef = ref(null)
 function buildHighlightedSql() {
   const raw = noteForm.sqlRecords || ''
   if (!raw) return ''
-  return raw
+  const escaped = raw
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    // 注释
-    .replace(/(--[^\n]*)/g, '<span class="sql-cmt">$1</span>')
-    // 字符串（单引号 / 双引号，处理转义）
-    .replace(/('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g, '<span class="sql-str">$1</span>')
-    // 数字
-    .replace(/\b(\d+\.?\d*)\b/g, '<span class="sql-num">$1</span>')
-    // 关键字
-    .replace(/\b([A-Za-z_][A-Za-z0-9_]*)\b/g, (m) =>
-      SQL_KEYWORDS.has(m.toUpperCase())
-        ? `<span class="sql-kw">${m}</span>`
-        : m
-    )
+  // 单次匹配 token，按优先级分类：注释 > 字符串 > 数字 > 关键字。
+  // 全局匹配不重叠，注释/字符串整体作为一个 token，内部不会再被二次高亮（避免嵌套 span 乱码）。
+  const tokenRe = /(--[^\n]*|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|\b\d+\.?\d*\b|\b[A-Za-z_][A-Za-z0-9_]*\b)/g
+  return escaped.replace(tokenRe, (m) => {
+    if (m.startsWith('--')) return `<span class="sql-cmt">${m}</span>`
+    if (m.startsWith("'") || m.startsWith('"')) return `<span class="sql-str">${m}</span>`
+    if (/^\d/.test(m)) return `<span class="sql-num">${m}</span>`
+    return SQL_KEYWORDS.has(m.toUpperCase()) ? `<span class="sql-kw">${m}</span>` : m
+  })
 }
 
 const highlightedSql = computed(() => buildHighlightedSql())
