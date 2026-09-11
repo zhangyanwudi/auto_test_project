@@ -1,0 +1,13 @@
+{
+    "connections": [
+        {
+            "id": "kolsys",
+            "name": "达人基建-测试库",
+            "host": "rm-dj1b0eddekmih4jp0.mysql.rds.aliyuncs.com",
+            "port": 3306,
+            "user": "db_admin",
+            "password": "9YBkiBiuhGc",
+            "database": "test"
+        }
+    ]
+}

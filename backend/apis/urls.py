@@ -17,5 +17,6 @@ urlpatterns = [
     path('gp_logcat/', include('apis.gp_logcat.urls')),
     path('mock_api/', include('apis.mock_api.urls')),
     path('case_govern/', include('apis.case_govern.urls')),
+    path('db_table_note/', include('apis.db_table_note.urls')),
     path('llm/', include('apis.llm.urls')),
 ]

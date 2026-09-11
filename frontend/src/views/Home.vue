@@ -198,6 +198,7 @@ import AiHelperPage from './ai_helper/AiHelperPage.vue'
 import GpLogcat from './gp_logcat/GpLogcat.vue'
 import MockApiManagement from './mock_api/MockApiManagement.vue'
 import CaseGovernManagement from './case_govern/CaseGovernManagement.vue'
+import DbTableNote from './db_table_note/DbTableNote.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -392,6 +393,7 @@ const viewMap = {
   gp_logcat: markRaw(GpLogcat),
   mock_api: markRaw(MockApiManagement),
   case_govern: markRaw(CaseGovernManagement),
+  db_table_note: markRaw(DbTableNote),
 }
 
 /** 规范化侧栏传来的 index（去空格），避免 `(code in menuTitleMap)` 误判 */

@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'apps.gp_logcat.apps.GpLogcatConfig',  # GP商业化日志
     'apps.mock_api.apps.MockApiConfig',  # Mock接口管理
     'apps.case_govern.apps.CaseGovernConfig',  # 用例管理
+    'apps.db_table_note.apps.DbTableNoteConfig',  # 数据库表备注
     'apps.llm.apps.LlmConfig',  # 本地LLM（Ollama）
 ]
 
