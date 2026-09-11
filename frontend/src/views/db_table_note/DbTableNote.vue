@@ -2,190 +2,190 @@
   <div class="db-table-note-page">
     <el-card shadow="never">
       <div class="layout">
-        <!-- 左侧：连接 + 表列表（表项可内联展开字段） -->
-        <div class="left-panel">
-          <div class="conn-row">
-            <el-select
-              v-model="currentConnId"
-              placeholder="选择数据库连接"
-              style="flex: 1"
-              @change="onConnChange"
-            >
-              <el-option
-                v-for="c in connections"
-                :key="c.id"
-                :label="c.name"
-                :value="c.id"
-              />
-            </el-select>
-            <el-dropdown trigger="click" @command="onConnCommand">
-              <el-button size="small" :icon="Setting">管理</el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="add">新增连接</el-dropdown-item>
-                  <el-dropdown-item v-if="currentConnId" command="edit">编辑当前连接</el-dropdown-item>
-                  <el-dropdown-item v-if="currentConnId" command="delete" divided>删除当前连接</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
+        <!-- 上半：左侧表列表 + 右侧 SQL 编辑 -->
+        <div class="top-area">
+          <!-- 左侧：连接 + 表列表（表项可内联展开字段） -->
+          <div class="left-panel">
+            <div class="conn-row">
+              <el-select
+                v-model="currentConnId"
+                placeholder="选择数据库连接"
+                style="flex: 1"
+                @change="onConnChange"
+              >
+                <el-option
+                  v-for="c in connections"
+                  :key="c.id"
+                  :label="c.name"
+                  :value="c.id"
+                />
+              </el-select>
+              <el-dropdown trigger="click" @command="onConnCommand">
+                <el-button size="small" :icon="Setting">管理</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="add">新增连接</el-dropdown-item>
+                    <el-dropdown-item v-if="currentConnId" command="edit">编辑当前连接</el-dropdown-item>
+                    <el-dropdown-item v-if="currentConnId" command="delete" divided>删除当前连接</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
 
-          <el-input
-            v-model="tableKeyword"
-            clearable
-            placeholder="搜索表名、注释…"
-            class="table-search"
-            :prefix-icon="Search"
-            @input="onTableSearch"
-          />
+            <el-input
+              v-model="tableKeyword"
+              clearable
+              placeholder="搜索表名、注释…"
+              class="table-search"
+              :prefix-icon="Search"
+              @input="onTableSearch"
+            />
 
-          <div class="table-list" v-loading="tableLoading">
-            <el-empty v-if="!tableLoading && !tables.length" description="暂无表数据" :image-size="60" />
-            <div
-              v-for="t in tables"
-              :key="t.table_name"
-              class="table-item"
-              :class="{ 'is-active': t.table_name === currentTable }"
-            >
-              <div class="table-row" @click="selectTable(t)">
-                <el-icon
-                  class="expand-arrow"
-                  :class="{ 'is-expanded': isFieldsExpanded(t) }"
-                  @click.stop="toggleTableFields(t)"
-                >
-                  <ArrowRight v-if="!isFieldsExpanded(t)" />
-                  <ArrowDown v-else />
-                </el-icon>
-                <div class="table-main">
-                  <div class="table-name">
-                    {{ t.table_name }}
-                    <el-tag v-if="t.has_note" size="small" type="success" effect="plain">已备注</el-tag>
-                  </div>
-                  <div class="table-comment" :title="t.comment">
-                    <el-icon class="comment-icon"><ChatLineRound /></el-icon>
-                    <span class="comment-text">{{ t.comment || '暂无注释' }}</span>
-                    <el-icon
-                      class="note-edit-icon"
-                      title="编辑表备注"
-                      @click.stop="openNoteDialog(t)"
-                    >
-                      <EditPen />
-                    </el-icon>
+            <div class="table-list" v-loading="tableLoading">
+              <el-empty v-if="!tableLoading && !tables.length" description="暂无表数据" :image-size="60" />
+              <div
+                v-for="t in tables"
+                :key="t.table_name"
+                class="table-item"
+                :class="{ 'is-active': t.table_name === currentTable }"
+              >
+                <div class="table-row" @click="selectTable(t)">
+                  <el-icon
+                    class="expand-arrow"
+                    :class="{ 'is-expanded': isFieldsExpanded(t) }"
+                    @click.stop="toggleTableFields(t)"
+                  >
+                    <ArrowRight v-if="!isFieldsExpanded(t)" />
+                    <ArrowDown v-else />
+                  </el-icon>
+                  <div class="table-main">
+                    <div class="table-name">
+                      {{ t.table_name }}
+                      <el-tag v-if="t.has_note" size="small" type="success" effect="plain">已备注</el-tag>
+                    </div>
+                    <div class="table-comment" :title="t.comment">
+                      <el-icon class="comment-icon"><ChatLineRound /></el-icon>
+                      <span class="comment-text">{{ t.comment || '暂无注释' }}</span>
+                      <el-icon
+                        class="note-edit-icon"
+                        title="编辑表备注"
+                        @click.stop="openNoteDialog(t)"
+                      >
+                        <EditPen />
+                      </el-icon>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div v-if="isFieldsExpanded(t)" class="table-fields" v-loading="isFieldsLoading(t)">
-                <div class="fields-mini-head">
-                  <span class="fields-mini-title">字段备注</span>
-                  <el-button size="small" type="primary" text @click="saveFieldNotes(t)">
-                    保存
-                  </el-button>
-                </div>
-                <div
-                  v-for="row in fieldsMap[t.table_name] || []"
-                  :key="row.name"
-                  class="field-row"
-                >
-                  <span class="field-name" :title="row.name">{{ row.name }}</span>
-                  <el-input
-                    v-model="row.manual"
-                    size="small"
-                    class="field-input"
-                    :placeholder="row.comment || '补充备注'"
-                    @input="onFieldInput(t)"
-                  />
+                <div v-if="isFieldsExpanded(t)" class="table-fields" v-loading="isFieldsLoading(t)">
+                  <div class="fields-mini-head">
+                    <span class="fields-mini-title">字段备注</span>
+                    <el-button size="small" type="primary" text @click="saveFieldNotes(t)">
+                      保存
+                    </el-button>
+                  </div>
+                  <div
+                    v-for="row in fieldsMap[t.table_name] || []"
+                    :key="row.name"
+                    class="field-row"
+                  >
+                    <span class="field-name" :title="row.name">{{ row.name }}</span>
+                    <el-input
+                      v-model="row.manual"
+                      size="small"
+                      class="field-input"
+                      :placeholder="row.comment || '补充备注'"
+                      @input="onFieldInput(t)"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- 右侧：表信息 + 执行 SQL -->
+          <div class="right-panel">
+            <template v-if="!currentTable">
+              <el-empty description="请在左侧选择一张表" />
+            </template>
+            <template v-else>
+              <div class="note-head">
+                <div class="note-head-left">
+                  <span class="note-title">{{ currentTable }}</span>
+                  <span class="note-comment" :title="currentTableComment">{{ currentTableComment }}</span>
+                </div>
+                <div class="note-actions">
+                  <el-button size="small" :loading="noteSaving" @click="reloadNote">重置</el-button>
+                  <el-button size="small" type="primary" :loading="noteSaving" @click="saveSqlRecords">保存 SQL</el-button>
+                  <el-button
+                    size="small"
+                    type="success"
+                    :loading="executing"
+                    :disabled="!noteForm.sqlRecords.trim()"
+                    @click="runSql"
+                  >
+                    执行 SQL
+                  </el-button>
+                  <el-button size="small" :loading="executing" @click="clearResult">清空结果</el-button>
+                </div>
+              </div>
+
+              <p class="panel-label">相关执行 SQL（多条 SQL 用换行分隔，关键字自动高亮）</p>
+              <div class="sql-editor">
+                <pre ref="sqlHighlightRef" class="sql-highlight" aria-hidden="true"><code v-html="highlightedSql"></code></pre>
+                <textarea
+                  ref="sqlTextareaRef"
+                  v-model="noteForm.sqlRecords"
+                  class="sql-textarea"
+                  spellcheck="false"
+                  placeholder="记录这张表相关的执行 SQL，如查询、更新语句等"
+                  @scroll="onSqlScroll"
+                  @paste="onSqlPaste"
+                  @input="onSqlInput"
+                  @blur="onSqlBlur"
+                ></textarea>
+              </div>
+            </template>
           </div>
         </div>
 
-        <!-- 右侧：执行 SQL -->
-        <div class="right-panel">
-          <template v-if="!currentTable">
-            <el-empty description="请在左侧选择一张表" />
-          </template>
+        <!-- 下半：执行结果，全宽独占 -->
+        <div v-if="result" class="result-area">
+          <div class="result-head">
+            <span class="result-title">执行结果</span>
+            <span v-if="result.is_write" class="result-meta">
+              影响 {{ result.affected }} 行
+            </span>
+            <span v-else class="result-meta">
+              共 {{ result.row_count }} 行{{ result.truncated ? '（已截断，最多显示 ' + maxRows + ' 行）' : '' }}
+            </span>
+          </div>
+          <el-alert
+            v-if="result.is_write"
+            :title="'执行成功，影响 ' + result.affected + ' 行'"
+            type="success"
+            :closable="false"
+            show-icon
+          />
           <template v-else>
-            <div class="note-head">
-              <div class="note-head-left">
-                <span class="note-title">{{ currentTable }}</span>
-                <span class="note-comment" :title="currentTableComment">{{ currentTableComment }}</span>
-              </div>
-              <div class="note-actions">
-                <el-button size="small" :loading="noteSaving" @click="reloadNote">重置</el-button>
-                <el-button size="small" type="primary" :loading="noteSaving" @click="saveSqlRecords">保存 SQL</el-button>
-              </div>
-            </div>
-
-            <p class="panel-label">相关执行 SQL（多条 SQL 用换行分隔，关键字自动高亮）</p>
-            <div class="sql-editor">
-              <pre ref="sqlHighlightRef" class="sql-highlight" aria-hidden="true"><code v-html="highlightedSql"></code></pre>
-              <textarea
-                ref="sqlTextareaRef"
-                v-model="noteForm.sqlRecords"
-                class="sql-textarea"
-                spellcheck="false"
-                placeholder="记录这张表相关的执行 SQL，如查询、更新语句等"
-                @scroll="onSqlScroll"
-                @paste="onSqlPaste"
-                @input="onSqlInput"
-                @blur="onSqlBlur"
-              ></textarea>
-            </div>
-
-            <div class="sql-actions">
-              <el-button
-                size="small"
-                type="primary"
-                :loading="executing"
-                :disabled="!noteForm.sqlRecords.trim()"
-                @click="runSql"
-              >
-                执行 SQL
-              </el-button>
-              <el-button size="small" :loading="executing" @click="clearResult">清空结果</el-button>
-            </div>
-
-            <!-- 执行结果 -->
-            <div v-if="result" class="sql-result">
-              <div class="result-head">
-                <span class="result-title">执行结果</span>
-                <span v-if="result.is_write" class="result-meta">
-                  影响 {{ result.affected }} 行
-                </span>
-                <span v-else class="result-meta">
-                  共 {{ result.row_count }} 行{{ result.truncated ? '（已截断，最多显示 ' + maxRows + ' 行）' : '' }}
-                </span>
-              </div>
-              <el-alert
-                v-if="result.is_write"
-                :title="'执行成功，影响 ' + result.affected + ' 行'"
-                type="success"
-                :closable="false"
-                show-icon
+            <el-table
+              v-if="result.columns && result.columns.length"
+              :data="result.rows"
+              size="small"
+              border
+              max-height="420"
+              empty-text="查询无数据"
+            >
+              <el-table-column
+                v-for="(col, idx) in result.columns"
+                :key="idx"
+                :prop="String(idx)"
+                :label="col"
+                min-width="120"
+                show-overflow-tooltip
               />
-              <template v-else>
-                <el-table
-                  v-if="result.columns && result.columns.length"
-                  :data="result.rows"
-                  size="small"
-                  border
-                  max-height="360"
-                  empty-text="查询无数据"
-                >
-                  <el-table-column
-                    v-for="(col, idx) in result.columns"
-                    :key="idx"
-                    :prop="String(idx)"
-                    :label="col"
-                    min-width="120"
-                    show-overflow-tooltip
-                  />
-                </el-table>
-                <el-empty v-else description="无返回结果" :image-size="60" />
-              </template>
-            </div>
+            </el-table>
+            <el-empty v-else description="无返回结果" :image-size="60" />
           </template>
         </div>
       </div>
@@ -681,7 +681,9 @@ const sqlTextareaRef = ref(null)
 function buildHighlightedSql() {
   const raw = noteForm.sqlRecords || ''
   if (!raw) return ''
-  const escaped = raw
+  // 归一化弯引号为直引号，避免字符串引号不匹配（如 'xxx’）导致 token 无法闭合、后续关键字不高亮
+  const normalized = raw.replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+  const escaped = normalized
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -699,44 +701,81 @@ function buildHighlightedSql() {
 const highlightedSql = computed(() => buildHighlightedSql())
 
 /**
- * SQL 格式化：关键字转大写、子句换行、折叠多余空白（不触碰引号内字符串）。
+ * SQL 格式化：仅将 SQL 关键字转大写，完全保留原有空白/换行/缩进（不做 trim、折叠、子句重排）。
  * 在粘贴 / 失焦时自动调用，不弹窗确认。
  */
 function formatSqlText() {
   const raw = noteForm.sqlRecords || ''
   if (!raw.trim()) return
 
-  // 折叠多余空白
-  let sql = raw.replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim()
+  // 归一化弯引号，保证字符串引号匹配
+  const normalized = raw.replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
 
-  // 子句前换行
-  sql = sql.replace(
-    /\s+(SELECT|FROM|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|OFFSET|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|OUTER\s+JOIN|FULL\s+JOIN|JOIN|UNION\s+ALL|UNION|ON|SET|VALUES|AND|OR)\s+/gi,
-    '\n$1 '
-  )
+  // 按字符扫描，仅处理引号与注释之外的关键字（不触碰引号内字符串，也不改动任何空白字符）
+  let inSingle = false
+  let inDouble = false
+  let inLineComment = false
+  let result = ''
+  let i = 0
+  const n = normalized.length
 
-  // 关键字转大写（不触碰引号内的字符串）
-  const lines = sql.split('\n').map((line) => {
-    let inSingle = false
-    let inDouble = false
-    let result = ''
-    const tokens = line.split(/(\s+|[,()])/)
-    for (const tk of tokens) {
-      if (tk === "'") { inSingle = !inSingle; result += tk; continue }
-      if (tk === '"') { inDouble = !inDouble; result += tk; continue }
-      if (inSingle || inDouble) { result += tk; continue }
-      if (/^[\s,()]+$/.test(tk)) { result += tk; continue }
-      const up = tk.toUpperCase()
-      result += SQL_KEYWORDS.has(up) ? up : tk
+  while (i < n) {
+    const ch = normalized[i]
+    const next = normalized[i + 1]
+
+    // 行注释 --
+    if (!inSingle && !inDouble && ch === '-' && next === '-') {
+      inLineComment = true
+      result += ch + next
+      i += 2
+      continue
     }
-    return result
-  })
-  sql = lines.join('\n')
 
-  // 规整每行首尾空白，去除连续空行
-  sql = sql.split('\n').map((l) => l.trim()).filter((l) => l !== '').join('\n')
+    if (inLineComment) {
+      if (ch === '\n') {
+        inLineComment = false
+      }
+      result += ch
+      i += 1
+      continue
+    }
 
-  noteForm.sqlRecords = sql
+    // 字符串起始/结束
+    if (!inDouble && ch === "'") {
+      inSingle = !inSingle
+      result += ch
+      i += 1
+      continue
+    }
+    if (!inSingle && ch === '"') {
+      inDouble = !inDouble
+      result += ch
+      i += 1
+      continue
+    }
+
+    if (inSingle || inDouble) {
+      result += ch
+      i += 1
+      continue
+    }
+
+    // 标识符：连续字母/数字/下划线，若命中关键字则转大写
+    if (/[A-Za-z_]/.test(ch)) {
+      let j = i
+      while (j < n && /[A-Za-z0-9_]/.test(normalized[j])) j += 1
+      const word = normalized.slice(i, j)
+      const up = word.toUpperCase()
+      result += SQL_KEYWORDS.has(up) ? up : word
+      i = j
+      continue
+    }
+
+    result += ch
+    i += 1
+  }
+
+  noteForm.sqlRecords = result
 }
 
 /** 手动接管粘贴：自己替换选中区间（避免默认粘贴与 v-model 竞态导致「追加而非替换」），随后格式化 + 高亮 */
@@ -897,8 +936,15 @@ onMounted(async () => {
 
 .layout {
   display: flex;
+  flex-direction: column;
   gap: 16px;
   min-height: 520px;
+}
+
+.top-area {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
 }
 
 .left-panel {
@@ -1129,7 +1175,8 @@ onMounted(async () => {
 
 .sql-editor {
   position: relative;
-  height: 420px;
+  flex: 1;
+  min-height: 420px;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   background: #fff;
@@ -1205,15 +1252,12 @@ onMounted(async () => {
   margin-bottom: 10px;
 }
 
-.sql-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.sql-result {
+.result-area {
+  width: 100%;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  padding: 8px;
+  padding: 10px 12px;
+  box-sizing: border-box;
 }
 
 .result-head {
