@@ -297,6 +297,8 @@ def table_list(request):
             'field_notes': field_notes,
             'has_note': table_name in note_map,
         })
+    # 已备注的表优先展示在前面，同组内按表名排序
+    data.sort(key=lambda x: (not x['has_note'], x['table_name'].lower()))
     return JsonResponse({'code': 0, 'data': data})
 
 
