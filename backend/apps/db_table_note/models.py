@@ -24,3 +24,27 @@ class ZDbTableNote(models.Model):
 
     def __str__(self):
         return '%s/%s' % (self.connection_id, self.table_name)
+
+
+class ZDbTableNoteConnection(models.Model):
+    """数据库连接配置 z_db_table_note_connection：存储连接信息，避免部署时被覆盖丢失。"""
+
+    connection_id = models.CharField('连接配置标识', max_length=64, unique=True, db_index=True)
+    name = models.CharField('显示名称', max_length=128, blank=True, default='')
+    host = models.CharField('地址', max_length=255)
+    port = models.IntegerField('端口', default=3306)
+    user = models.CharField('用户名', max_length=128)
+    password = models.CharField('密码', max_length=255)
+    database = models.CharField('数据库名', max_length=128)
+    create_time = models.DateTimeField('创建时间', auto_now_add=True)
+    update_time = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        app_label = 'db_table_note'
+        db_table = 'z_db_table_note_connection'
+        verbose_name = '数据库连接配置'
+        verbose_name_plural = '数据库连接配置'
+        ordering = ['id']
+
+    def __str__(self):
+        return '%s(%s)' % (self.name or self.connection_id, self.connection_id)

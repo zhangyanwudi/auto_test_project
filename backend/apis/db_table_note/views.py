@@ -8,17 +8,18 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from apps.db_table_note.models import ZDbTableNote
+from apps.db_table_note.models import ZDbTableNote, ZDbTableNoteConnection
 from apps.users.decorators import require_valid_token
 
 logger = logging.getLogger('apis.db_table_note')
 
-# 连接配置（backend/config/db_table_note_config.json）
+# 兼容旧版：连接配置曾存于 config/db_table_note_config.json，
+# 现已迁移到数据库 z_db_table_note_connection；此路径仅用于首次迁移时读取。
 CONFIG_PATH = Path(__file__).resolve().parents[2] / 'config' / 'db_table_note_config.json'
 
 
-def _load_connections():
-    """读取连接配置列表；失败返回空列表。"""
+def _load_legacy_json_connections():
+    """读取旧版 json 连接配置（仅迁移用）；失败返回空列表。"""
     try:
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -27,11 +28,42 @@ def _load_connections():
         return []
 
 
-def _save_connections(connections):
-    """写回连接配置列表。"""
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        json.dump({'connections': connections}, f, ensure_ascii=False, indent=4)
+def _migrate_legacy_connections():
+    """首次访问时，把旧 json 里的连接迁入数据库（已存在则跳过）。"""
+    legacy = _load_legacy_json_connections()
+    for c in legacy:
+        conn_id = str(c.get('id', '')).strip()
+        if not conn_id:
+            continue
+        ZDbTableNoteConnection.objects.get_or_create(
+            connection_id=conn_id,
+            defaults={
+                'name': (c.get('name') or '').strip() or conn_id,
+                'host': c.get('host', ''),
+                'port': int(c.get('port') or 3306),
+                'user': c.get('user', ''),
+                'password': c.get('password', ''),
+                'database': c.get('database', ''),
+            },
+        )
+
+
+def _load_connections():
+    """从数据库读取连接配置（含密码，仅后端内部使用）。"""
+    _migrate_legacy_connections()
+    return list(ZDbTableNoteConnection.objects.all().order_by('id'))
+
+
+def _connection_row_to_dict(m):
+    return {
+        'id': m.connection_id,
+        'name': m.name,
+        'host': m.host,
+        'port': m.port,
+        'user': m.user,
+        'password': m.password,
+        'database': m.database,
+    }
 
 
 def _parse_body(request):
@@ -42,10 +74,12 @@ def _parse_body(request):
 
 
 def _connection_by_id(conn_id):
-    for c in _load_connections():
-        if str(c.get('id', '')) == str(conn_id):
-            return c
-    return None
+    _migrate_legacy_connections()
+    try:
+        m = ZDbTableNoteConnection.objects.get(connection_id=str(conn_id))
+    except ZDbTableNoteConnection.DoesNotExist:
+        return None
+    return _connection_row_to_dict(m)
 
 
 def _public_connection(c):
@@ -125,14 +159,18 @@ def _fetch_table_columns(cfg, table_name):
 @require_valid_token
 def connection_list(request):
     """连接列表（脱敏，不回传密码）。"""
-    return JsonResponse({'code': 0, 'data': [_public_connection(c) for c in _load_connections()]})
+    _migrate_legacy_connections()
+    return JsonResponse({
+        'code': 0,
+        'data': [_public_connection(_connection_row_to_dict(c)) for c in _load_connections()],
+    })
 
 
 @csrf_exempt
 @require_http_methods(['POST'])
 @require_valid_token
 def connection_save(request):
-    """新增/编辑连接配置；编辑时 password 留空表示保持原密码不变。"""
+    """新增/编辑连接配置（存数据库）；编辑时 password 留空表示保持原密码不变。"""
     body = _parse_body(request)
     if body is None:
         return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)
@@ -145,46 +183,43 @@ def connection_save(request):
     if not host or not user or not database:
         return JsonResponse({'code': 400, 'message': '地址、用户名、数据库不能为空'}, status=400)
 
-    connections = _load_connections()
-    idx = next((i for i, c in enumerate(connections) if str(c.get('id', '')) == conn_id), None)
-
     port = body.get('port') or 3306
     try:
         port = int(port)
     except (TypeError, ValueError):
         port = 3306
 
-    if idx is None:
+    try:
+        m = ZDbTableNoteConnection.objects.get(connection_id=conn_id)
+    except ZDbTableNoteConnection.DoesNotExist:
+        m = None
+
+    password = (body.get('password') or '').strip()
+    if m is None:
         # 新增：密码必填
-        password = (body.get('password') or '').strip()
         if not password:
             return JsonResponse({'code': 400, 'message': '新增连接时密码不能为空'}, status=400)
-        new_item = {
-            'id': conn_id,
-            'name': (body.get('name') or '').strip() or conn_id,
-            'host': host,
-            'port': port,
-            'user': user,
-            'password': password,
-            'database': database,
-        }
-        connections.append(new_item)
+        ZDbTableNoteConnection.objects.create(
+            connection_id=conn_id,
+            name=(body.get('name') or '').strip() or conn_id,
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
+        )
     else:
-        old = connections[idx]
-        password = (body.get('password') or '').strip()
+        # 编辑：password 留空保持原密码
         if not password:
-            password = old.get('password', '')  # 留空保持原密码
-        connections[idx] = {
-            'id': conn_id,
-            'name': (body.get('name') or '').strip() or old.get('name', '') or conn_id,
-            'host': host,
-            'port': port,
-            'user': user,
-            'password': password,
-            'database': database,
-        }
+            password = m.password
+        m.name = (body.get('name') or '').strip() or m.name or conn_id
+        m.host = host
+        m.port = port
+        m.user = user
+        m.password = password
+        m.database = database
+        m.save()
 
-    _save_connections(connections)
     return JsonResponse({'code': 0, 'message': '保存成功'})
 
 
@@ -199,8 +234,7 @@ def connection_delete(request):
     conn_id = (body.get('id') or '').strip()
     if not conn_id:
         return JsonResponse({'code': 400, 'message': '连接标识不能为空'}, status=400)
-    connections = [c for c in _load_connections() if str(c.get('id', '')) != conn_id]
-    _save_connections(connections)
+    ZDbTableNoteConnection.objects.filter(connection_id=conn_id).delete()
     return JsonResponse({'code': 0, 'message': '已删除'})
 
 

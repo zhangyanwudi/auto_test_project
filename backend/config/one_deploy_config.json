@@ -22,6 +22,7 @@
         "venv",
         ".venv",
         "one_deploy.py",
-        "config.json"
+        "config.json",
+        "db_table_note_config.json"
     ]
 }
