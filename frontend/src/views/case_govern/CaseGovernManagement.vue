@@ -165,6 +165,25 @@
         @dirty-change="onMindDirty"
       />
     </el-dialog>
+
+    <!-- 悬浮 AI 助手按钮 -->
+    <div class="ai-float-btn" title="AI 助手" @click="aiChatVisible = true">
+      <svg class="ai-robot-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="22" width="28" height="20" rx="4" fill="white" stroke="white" stroke-width="0.5"/>
+        <rect x="18" y="8" width="12" height="16" rx="5" fill="white"/>
+        <circle cx="21" cy="16" r="2.5" fill="#409eff"/>
+        <circle cx="27" cy="16" r="2.5" fill="#409eff"/>
+        <rect x="21" y="28" width="6" height="2" rx="1" fill="#409eff"/>
+        <rect x="15" y="32" width="18" height="4" rx="1.5" fill="#409eff"/>
+        <circle cx="16" cy="6" r="2" fill="white"/>
+        <rect x="14" y="11" width="4" height="6" rx="2" fill="white"/>
+        <circle cx="32" cy="6" r="2" fill="white"/>
+        <rect x="30" y="11" width="4" height="6" rx="2" fill="white"/>
+      </svg>
+    </div>
+
+    <!-- AI 对话对话框 -->
+    <AiChatDialog v-model:visible="aiChatVisible" />
   </div>
 </template>
 
@@ -182,6 +201,7 @@ import {
 } from '../../api/case_govern/caseGovern.js'
 import { getUserCnName, getUsername } from '../../common/request.js'
 import MindMapEditor from './MindMapEditor.vue'
+import AiChatDialog from '../../components/AiChatDialog.vue'
 
 const loading = ref(false)
 const list = ref([])
@@ -201,6 +221,7 @@ const moduleConfig = {
 }
 const importInput = ref(null)
 const importing = ref(false)
+const aiChatVisible = ref(false)
 
 const PRIORITY_LABELS = { 1: '高', 2: '中', 3: '低' }
 
@@ -639,5 +660,59 @@ defineExpose({
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.ai-float-btn {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  z-index: 1000;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #409eff, #66b1ff);
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s, box-shadow 0.25s;
+  user-select: none;
+}
+
+.ai-float-btn:hover {
+  transform: scale(1.12);
+  box-shadow: 0 6px 24px rgba(64, 158, 255, 0.55);
+}
+
+.ai-float-btn:active {
+  transform: scale(0.95);
+}
+
+.ai-robot-icon {
+  width: 36px;
+  height: 36px;
+  pointer-events: none;
+}
+
+/* 呼吸灯脉冲动画 */
+.ai-float-btn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(64, 158, 255, 0.35);
+  animation: ai-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
 }
 </style>

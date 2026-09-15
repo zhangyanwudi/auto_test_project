@@ -31,3 +31,26 @@ class ZConfigCompareStat(models.Model):
 
     def __str__(self):
         return f'{self.user_name} - {self.compare_type} - {self.create_time}'
+
+
+class ZFeatureUsage(models.Model):
+    """功能使用记录：用户进入某功能页停留满 1 分钟计一次使用。"""
+
+    menu_code = models.CharField('功能编码', max_length=64)
+    menu_name = models.CharField('功能名称', max_length=128)
+    user_name = models.CharField('使用人', max_length=255)
+    create_time = models.DateTimeField('上报时间', auto_now_add=True)
+
+    class Meta:
+        app_label = 'operate_tool'
+        db_table = 'z_feature_usage'
+        verbose_name = '功能使用记录'
+        verbose_name_plural = '功能使用记录'
+        ordering = ['-id']
+        indexes = [
+            models.Index(fields=['menu_code', 'create_time'], name='idx_menu_time'),
+            models.Index(fields=['create_time'], name='idx_feature_create_time'),
+        ]
+
+    def __str__(self):
+        return f'{self.menu_code} - {self.user_name} - {self.create_time}'

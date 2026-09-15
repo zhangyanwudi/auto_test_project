@@ -104,7 +104,7 @@
             <el-col :xs="24" :lg="12">
               <el-card shadow="hover" class="chart-card">
                 <template #header>
-                  <span class="chart-title">比对类型分布</span>
+                  <span class="chart-title">各功能使用占比</span>
                 </template>
                 <div ref="homePieChartRef" class="chart-container"></div>
               </el-card>
@@ -112,7 +112,7 @@
             <el-col :xs="24" :lg="12">
               <el-card shadow="hover" class="chart-card">
                 <template #header>
-                  <span class="chart-title">各项目比对次数</span>
+                  <span class="chart-title">各功能使用次数</span>
                 </template>
                 <div ref="homeBarChartRef" class="chart-container"></div>
               </el-card>
@@ -122,7 +122,7 @@
           <!-- 趋势图 -->
           <el-card shadow="hover" class="chart-card">
             <template #header>
-              <span class="chart-title">今日比对趋势（按小时）</span>
+              <span class="chart-title">今日各功能活跃度（按小时）</span>
             </template>
             <div ref="homeLineChartRef" class="chart-container chart-line"></div>
           </el-card>
@@ -131,23 +131,14 @@
           <el-card shadow="hover" class="recent-card">
             <template #header>
               <div class="recent-head">
-                <span class="recent-title">今日比对记录</span>
-                <el-tag size="small" type="info" effect="plain">最近 10 条</el-tag>
+                <span class="recent-title">最近功能使用记录</span>
+                <el-tag size="small" type="info" effect="plain">最近 20 条</el-tag>
               </div>
             </template>
-            <el-table :data="homeRecentList" v-loading="homeLoading" stripe size="default" empty-text="今日暂无比对记录">
-              <el-table-column prop="create_time" label="时间" width="180" sortable />
+            <el-table :data="homeRecentList" v-loading="homeLoading" stripe size="default" empty-text="暂无功能使用记录">
+              <el-table-column prop="use_time" label="时间" width="180" sortable />
               <el-table-column prop="user_name" label="用户" width="120" />
-              <el-table-column prop="project_names" label="项目" min-width="160" show-overflow-tooltip />
-              <el-table-column prop="compare_type" label="类型" width="90">
-                <template #default="{ row }">
-                  <el-tag :type="row.compare_type === 'batch' ? 'warning' : 'primary'" size="small" effect="light">
-                    {{ row.compare_type === 'batch' ? '批量' : '单次' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="left_Adwaynum" label="左侧方案" min-width="140" show-overflow-tooltip />
-              <el-table-column prop="right_Adwaynum" label="右侧方案" min-width="140" show-overflow-tooltip />
+              <el-table-column prop="menu_name" label="功能" min-width="160" show-overflow-tooltip />
             </el-table>
           </el-card>
         </div>
@@ -185,7 +176,7 @@ import {
 } from '@element-plus/icons-vue'
 import { getUserCnName, clearToken, requestWithToken, syncUserProfileFromTokenData, getPageTitle } from '../common/request.js'
 import { fetchSidebarMenuList } from '../api/system/menu.js'
-import { get_daily_statistic } from '../api/home/index.js'
+import { getFeatureUsageStatistic, reportFeatureUsage } from '../api/home/index.js'
 import MenuManagement from './system/MenuManagement.vue'
 import UserManagement from './system/UserManagement.vue'
 import RoleManagement from './system/RoleManagement.vue'
@@ -217,24 +208,49 @@ const menuTitleMap = ref({ home: '' })
 /** 首页统计数据 */
 const homeLoading = ref(false)
 const homeStats = reactive({
-  total_count: 0,
-  single_count: 0,
-  batch_count: 0,
-  unique_users: 0,
-  unique_projects: 0,
-  project_stats: [],
-  hourly_stats: [],
+  total_usage: 0,
+  kpi: [],
+  distribution: [],
+  trend: [],
   recent_list: [],
 })
 
-/** KPI 卡片配置 */
-const homeStatCards = computed(() => [
-  { key: 'total', label: '总比对次数', value: homeStats.total_count, icon: DataAnalysis, bg: '#ecf5ff', color: '#409eff' },
-  { key: 'single', label: '单次对比', value: homeStats.single_count, icon: Document, bg: '#f0f9eb', color: '#67c23a' },
-  { key: 'batch', label: '批量比对', value: homeStats.batch_count, icon: Operation, bg: '#fdf6ec', color: '#e6a23c' },
-  { key: 'users', label: '操作用户', value: homeStats.unique_users, icon: User, bg: '#fef0f0', color: '#f56c6c' },
-  { key: 'projects', label: '涉及项目', value: homeStats.unique_projects, icon: FolderOpened, bg: '#f4f4f5', color: '#909399' },
-])
+/** 各功能 KPI 卡片图标与配色（按 menu_code） */
+const FEATURE_CARD_META = {
+  case_govern: { icon: Document, bg: '#ecf5ff', color: '#409eff' },
+  ai_helper: { icon: DataAnalysis, bg: '#f0f9eb', color: '#67c23a' },
+  mock_api: { icon: Operation, bg: '#fdf6ec', color: '#e6a23c' },
+  scheduled_task: { icon: FolderOpened, bg: '#f4f4f5', color: '#909399' },
+  db_table_note: { icon: User, bg: '#fef0f0', color: '#f56c6c' },
+  config_compare: { icon: SwitchButton, bg: '#f5f3ff', color: '#7c4dff' },
+}
+
+/** 各功能 menu_code -> 名称（与后端 FEATURE_MENUS 一致，埋点上报用） */
+const FEATURE_NAMES = {
+  case_govern: '用例管理',
+  ai_helper: 'AI助手',
+  mock_api: 'Mock接口',
+  scheduled_task: '定时任务',
+  db_table_note: '数据库备注',
+  config_compare: '配置比对',
+}
+
+/** KPI 卡片配置：按功能模块展示使用次数 */
+const homeStatCards = computed(() => {
+  const list = homeStats.kpi || []
+  if (!list.length) return []
+  return list.map((item) => {
+    const meta = FEATURE_CARD_META[item.menu_code] || { icon: Document, bg: '#ecf5ff', color: '#409eff' }
+    return {
+      key: item.menu_code,
+      label: item.menu_name,
+      value: item.usage_count,
+      icon: meta.icon,
+      bg: meta.bg,
+      color: meta.color,
+    }
+  })
+})
 
 const homeRecentList = computed(() => homeStats.recent_list || [])
 
@@ -262,14 +278,16 @@ function initHomeCharts() {
   if (homeLineChartRef.value) homeLineChart = echarts.init(homeLineChartRef.value)
 }
 
-/** 饼图 — 单次 vs 批量 */
+/** 饼图 — 各功能使用占比 */
 function renderHomePie() {
   if (!homePieChart) return
-  const { single_count, batch_count } = homeStats
-  const data = [
-    { value: single_count, name: '单次对比', itemStyle: { color: '#409eff' } },
-    { value: batch_count, name: '批量比对', itemStyle: { color: '#e6a23c' } },
-  ]
+  const list = homeStats.distribution || []
+  const palette = ['#409eff', '#67c23a', '#e6a23c', '#909399', '#f56c6c', '#7c4dff']
+  const data = list.map((x, i) => ({
+    value: x.value,
+    name: x.name,
+    itemStyle: { color: palette[i % palette.length] },
+  }))
   homePieChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c} 次 ({d}%)' },
     legend: { bottom: 0, textStyle: { color: '#606266' } },
@@ -285,10 +303,10 @@ function renderHomePie() {
   }, true)
 }
 
-/** 柱状图 — 各项目比对次数 */
+/** 柱状图 — 各功能使用次数 */
 function renderHomeBar() {
   if (!homeBarChart) return
-  const list = homeStats.project_stats || []
+  const list = homeStats.kpi || []
   homeBarChart.setOption({
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 8, right: 16, top: 8, bottom: 0, containLabel: true },
@@ -298,12 +316,12 @@ function renderHomeBar() {
       splitLine: { lineStyle: { color: '#f0f0f0' } },
     },
     yAxis: {
-      type: 'category', data: list.map(x => x.name),
+      type: 'category', data: list.map(x => x.menu_name),
       axisLabel: { color: '#606266', fontSize: 11, width: 80, overflow: 'truncate' },
       axisLine: { show: false }, axisTick: { show: false },
     },
     series: [{
-      type: 'bar', data: list.map(x => x.count), barWidth: 16,
+      type: 'bar', data: list.map(x => x.usage_count), barWidth: 16,
       itemStyle: {
         borderRadius: [0, 4, 4, 0],
         color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
@@ -315,13 +333,17 @@ function renderHomeBar() {
   }, true)
 }
 
-/** 折线图 — 按小时趋势 */
+/** 折线图 — 近 1 天各功能活跃度按小时趋势 */
 function renderHomeLine() {
   if (!homeLineChart) return
-  const list = homeStats.hourly_stats || []
+  const list = homeStats.trend || []
+  const codes = ['case_govern', 'ai_helper', 'mock_api', 'scheduled_task', 'db_table_note', 'config_compare']
+  const codeName = { case_govern: '用例管理', ai_helper: 'AI助手', mock_api: 'Mock接口', scheduled_task: '定时任务', db_table_note: '数据库备注', config_compare: '配置比对' }
+  const palette = ['#409eff', '#67c23a', '#e6a23c', '#909399', '#f56c6c', '#7c4dff']
   homeLineChart.setOption({
     tooltip: { trigger: 'axis' },
-    grid: { left: 8, right: 24, top: 16, bottom: 0, containLabel: true },
+    legend: { top: 0, textStyle: { color: '#606266', fontSize: 11 } },
+    grid: { left: 8, right: 24, top: 32, bottom: 0, containLabel: true },
     xAxis: {
       type: 'category', data: list.map(x => x.hour), boundaryGap: false,
       axisLabel: { color: '#909399', fontSize: 11 },
@@ -332,18 +354,16 @@ function renderHomeLine() {
       axisLabel: { color: '#909399', fontSize: 11 },
       splitLine: { lineStyle: { color: '#f0f0f0' } },
     },
-    series: [{
-      type: 'line', data: list.map(x => x.count), smooth: true,
-      symbol: 'circle', symbolSize: 6,
-      lineStyle: { color: '#409eff', width: 2 },
-      itemStyle: { color: '#409eff' },
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(64,158,255,0.25)' },
-          { offset: 1, color: 'rgba(64,158,255,0.02)' },
-        ]),
-      },
-    }],
+    series: codes.map((code, i) => ({
+      name: codeName[code],
+      type: 'line',
+      data: list.map(x => x[code] ?? 0),
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 5,
+      lineStyle: { color: palette[i % palette.length], width: 2 },
+      itemStyle: { color: palette[i % palette.length] },
+    })),
   }, true)
 }
 
@@ -358,7 +378,7 @@ function renderHomeAllCharts() {
 async function fetchHomeStats() {
   homeLoading.value = true
   try {
-    const res = await get_daily_statistic()
+    const res = await getFeatureUsageStatistic()
     if (res.code === 0 && res.data) {
       Object.assign(homeStats, res.data)
       await nextTick()
@@ -420,6 +440,31 @@ function setActiveMenu(menu) {
   const c = canonicalMenuCode(menu) || 'home'
   activeMenu.value = c
   syncMenuToUrl(c)
+  startUsageTimer(c)
+}
+
+/* ---- 功能使用埋点：进入功能页停留满 1 分钟计一次使用 ---- */
+const USAGE_THRESHOLD_MS = 60 * 1000
+let usageTimer = null
+let usageStartAt = 0
+
+function startUsageTimer(menuCode) {
+  clearUsageTimer()
+  // 仅对纳入统计的功能埋点；首页/其它页不埋
+  const meta = FEATURE_CARD_META[menuCode]
+  if (!meta) return
+  usageStartAt = Date.now()
+  usageTimer = setTimeout(() => {
+    const name = FEATURE_NAMES[menuCode] || menuCode
+    reportFeatureUsage(menuCode, name).catch(() => {})
+  }, USAGE_THRESHOLD_MS)
+}
+
+function clearUsageTimer() {
+  if (usageTimer) {
+    clearTimeout(usageTimer)
+    usageTimer = null
+  }
 }
 
 /** 从 URL query 恢复上次停留的侧栏页签（无则首页） */
@@ -597,12 +642,15 @@ onMounted(() => {
   window.addEventListener('admin-menu-updated', onMenuUpdated)
   window.addEventListener('ai-tool-navigate', onAiToolNavigate)
   window.addEventListener('resize', onHomeResize)
+  // 若通过 URL 直接进入某功能页，也启动使用埋点
+  startUsageTimer(activeMenu.value)
 })
 
 onUnmounted(() => {
   window.removeEventListener('admin-menu-updated', onMenuUpdated)
   window.removeEventListener('ai-tool-navigate', onAiToolNavigate)
   window.removeEventListener('resize', onHomeResize)
+  clearUsageTimer()
   disposeHomeCharts()
 })
 
