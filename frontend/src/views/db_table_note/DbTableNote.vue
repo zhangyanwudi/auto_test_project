@@ -851,7 +851,10 @@ function formatSqlText() {
     i += 1
   }
 
-  noteForm.sqlRecords = result
+  // 结果与当前值相同时不赋值，避免无意义重渲染导致光标/选区丢失
+  if (result !== raw) {
+    noteForm.sqlRecords = result
+  }
 }
 
 /** 手动接管粘贴：自己替换选中区间（避免默认粘贴与 v-model 竞态导致「追加而非替换」），随后格式化 + 高亮 */
