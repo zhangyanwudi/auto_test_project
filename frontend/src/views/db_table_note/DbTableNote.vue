@@ -300,7 +300,7 @@ const maxRows = 500        // 与后端 MAX_QUERY_ROWS 一致，仅用于提示�
 
 // 结果列宽：按内容自适应，内容超过 COL_MAX_WIDTH 则固定为该值；留白用于内容较短的列
 const COL_MIN_WIDTH = 80
-const COL_MAX_WIDTH = 200
+const COL_MAX_WIDTH = 500
 const COL_CHAR_WIDTH = 14  // 每个字符约占用 14px
 
 const currentConn = computed(() =>
