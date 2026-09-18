@@ -181,9 +181,23 @@
                 :key="idx"
                 :prop="String(idx)"
                 :label="col"
-                min-width="120"
+                :width="resultColumnWidths[idx]"
                 show-overflow-tooltip
-              />
+              >
+                <template #default="{ row }">
+                  <div v-if="isCellOverflow(row[idx])" class="cell-with-copy">
+                    <span class="cell-text">{{ formatCellValue(row[idx]) }}</span>
+                    <el-icon
+                      class="cell-copy-icon"
+                      title="复制内容"
+                      @click.stop="copyCell(row[idx])"
+                    >
+                      <CopyDocument />
+                    </el-icon>
+                  </div>
+                  <span v-else>{{ formatCellValue(row[idx]) }}</span>
+                </template>
+              </el-table-column>
             </el-table>
             <el-empty v-else description="无返回结果" :image-size="60" />
           </template>
@@ -258,7 +272,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Setting, Search, ChatLineRound, EditPen, ArrowRight, ArrowDown } from '@element-plus/icons-vue'
+import { Setting, Search, ChatLineRound, EditPen, ArrowRight, ArrowDown, CopyDocument } from '@element-plus/icons-vue'
 import {
   fetchConnectionList,
   saveConnection,
@@ -284,9 +298,71 @@ const executing = ref(false)
 const result = ref(null)   // { columns: [...], rows: [[...]], row_count, truncated }
 const maxRows = 500        // 与后端 MAX_QUERY_ROWS 一致，仅用于提示文案
 
+// 结果列宽：按内容自适应，内容超过 COL_MAX_WIDTH 则固定为该值；留白用于内容较短的列
+const COL_MIN_WIDTH = 80
+const COL_MAX_WIDTH = 200
+const COL_CHAR_WIDTH = 14  // 每个字符约占用 14px
+
 const currentConn = computed(() =>
   connections.value.find((c) => c.id === currentConnId.value)
 )
+
+/** 计算每列宽度：取表头与所有单元格内容的最长长度，× 字符宽度后 clamp 到 [min, max] */
+const resultColumnWidths = computed(() => {
+  const r = result.value
+  if (!r || !Array.isArray(r.columns) || !r.columns.length) return []
+  return r.columns.map((col, idx) => {
+    let maxLen = String(col || '').length
+    const rows = Array.isArray(r.rows) ? r.rows : []
+    for (const row of rows) {
+      if (!Array.isArray(row)) continue
+      const v = row[idx]
+      const len = v == null ? 0 : String(v).length
+      if (len > maxLen) maxLen = len
+    }
+    const w = Math.round(maxLen * COL_CHAR_WIDTH)
+    return Math.min(Math.max(w, COL_MIN_WIDTH), COL_MAX_WIDTH)
+  })
+})
+
+/** 单元格显示文本（null → 空串） */
+function formatCellValue(v) {
+  if (v == null) return ''
+  return String(v)
+}
+
+/** 判断单元格内容是否超出列宽（超长 → 显示复制图标） */
+function isCellOverflow(v) {
+  const text = formatCellValue(v)
+  if (!text) return false
+  return text.length * COL_CHAR_WIDTH > COL_MAX_WIDTH
+}
+
+/** 复制单元格内容 */
+async function copyCell(v) {
+  const text = formatCellValue(v)
+  if (!text) return
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.top = '0'
+      ta.style.left = '0'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    ElMessage.success('已复制')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
 
 const noteForm = reactive({
   note: '',
@@ -1276,5 +1352,30 @@ onMounted(async () => {
 .result-meta {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.cell-with-copy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.cell-copy-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #909399;
+  cursor: pointer;
+}
+
+.cell-copy-icon:hover {
+  color: #409eff;
 }
 </style>

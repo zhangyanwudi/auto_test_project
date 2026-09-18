@@ -32,6 +32,7 @@
           :value="node.title"
           placeholder="未命名"
           @click.stop
+          @dblclick.stop
           @input="onTitleInput"
           @keydown.tab.prevent="onTab"
           @keydown.enter.prevent="onEnter"
@@ -179,6 +180,8 @@ function onSelect() {
 }
 function onEdit() {
   if (readonly) return
+  // 已在编辑态时不再重复进入（避免编辑框内双击冒泡再次触发，导致宽度被重置）
+  if (isEditing.value) return
   // 进入编辑前记录标题当前宽度，让编辑输入框与节点保持等宽，避免长标题节点编辑时变小
   if (titleRef.value) {
     editWidth.value = Math.max(titleRef.value.offsetWidth, 160)
