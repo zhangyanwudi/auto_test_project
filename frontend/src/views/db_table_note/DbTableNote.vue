@@ -170,11 +170,15 @@
           <template v-else>
             <el-table
               v-if="result.columns && result.columns.length"
+              ref="resultTableRef"
               :data="result.rows"
               size="small"
               border
               max-height="420"
               empty-text="查询无数据"
+              highlight-current-row
+              :row-class-name="tableRowClassName"
+              @current-change="onResultRowChange"
             >
               <el-table-column
                 v-for="(col, idx) in result.columns"
@@ -184,13 +188,13 @@
                 :width="resultColumnWidths[idx]"
                 show-overflow-tooltip
               >
-                <template #default="{ row }">
+                <template #default="{ row, $index }">
                   <div v-if="isCellOverflow(row[idx])" class="cell-with-copy">
                     <span class="cell-text">{{ formatCellValue(row[idx]) }}</span>
                     <el-icon
                       class="cell-copy-icon"
                       title="复制内容"
-                      @click.stop="copyCell(row[idx])"
+                      @click.stop="copyCell(row[idx], $index)"
                     >
                       <CopyDocument />
                     </el-icon>
@@ -297,6 +301,9 @@ const noteSaving = ref(false)
 const executing = ref(false)
 const result = ref(null)   // { columns: [...], rows: [[...]], row_count, truncated }
 const maxRows = 500        // 与后端 MAX_QUERY_ROWS 一致，仅用于提示文案
+const resultTableRef = ref(null)
+const resultCurrentRow = ref(null)  // 当前选中行
+const copiedRowIndex = ref(null)    // 最近一次复制操作所在行的索引
 
 // 结果列宽：按内容自适应，内容超过 COL_MAX_WIDTH 则固定为该值；留白用于内容较短的列
 const COL_MIN_WIDTH = 80
@@ -338,8 +345,8 @@ function isCellOverflow(v) {
   return text.length * COL_CHAR_WIDTH > COL_MAX_WIDTH
 }
 
-/** 复制单元格内容 */
-async function copyCell(v) {
+/** 复制单元格内容（记录所在行，复制后高亮该行便于回找） */
+async function copyCell(v, rowIndex) {
   const text = formatCellValue(v)
   if (!text) return
   try {
@@ -358,10 +365,31 @@ async function copyCell(v) {
       document.execCommand('copy')
       document.body.removeChild(ta)
     }
+    // 标记最近复制行，并在表格中选中该行，方便回头定位
+    copiedRowIndex.value = rowIndex
+    const rows = Array.isArray(result.value?.rows) ? result.value.rows : []
+    if (resultTableRef.value && rows[rowIndex]) {
+      resultTableRef.value.setCurrentRow(rows[rowIndex])
+    }
     ElMessage.success('已复制')
   } catch {
     ElMessage.error('复制失败')
   }
+}
+
+/** 表格当前行变化（点击行）时记录选中行 */
+function onResultRowChange(row) {
+  resultCurrentRow.value = row
+}
+
+/** 行样式：复制过的行打标记、当前选中行高亮 */
+function tableRowClassName({ row, rowIndex }) {
+  const rows = Array.isArray(result.value?.rows) ? result.value.rows : []
+  const classes = []
+  if (rowIndex === copiedRowIndex.value) {
+    classes.push('row-copied')
+  }
+  return classes.join(' ')
 }
 
 const noteForm = reactive({
@@ -972,6 +1000,8 @@ async function runSql() {
   try {
     const res = await executeSql(currentConnId.value, sql, force)
     if (res.code === 0 && res.data) {
+      copiedRowIndex.value = null
+      resultCurrentRow.value = null
       if (res.data.is_write) {
         // 写操作：无结果集，展示影响行数
         result.value = {
@@ -997,6 +1027,8 @@ async function runSql() {
 
 function clearResult() {
   result.value = null
+  resultCurrentRow.value = null
+  copiedRowIndex.value = null
 }
 
 onMounted(async () => {
@@ -1380,5 +1412,10 @@ onMounted(async () => {
 
 .cell-copy-icon:hover {
   color: #409eff;
+}
+
+/* 最近复制操作所在行：淡蓝底标记，便于回头定位 */
+:deep(.el-table .row-copied > td) {
+  background-color: #ecf5ff !important;
 }
 </style>
