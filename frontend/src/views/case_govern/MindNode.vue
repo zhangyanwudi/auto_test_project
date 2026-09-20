@@ -59,6 +59,7 @@
         v-if="node.image"
         :src="node.image"
         :preview-src-list="[node.image]"
+        :zoom-rate="1.1"
         preview-teleported
         fit="cover"
         class="tcard-img"
