@@ -704,6 +704,7 @@ class MockApiServer:
             listen_host=self._host,
             listen_port=self._port,
             ssl_insecure=True,  # 忽略 SSL 证书验证，便于拦截 HTTPS
+            http2=False,  # 关闭 HTTP/2，强制 HTTP/1.1，规避拦截 HTTPS 时响应体传输失败（net::ERR_FAILED 200）
         )
 
         try:

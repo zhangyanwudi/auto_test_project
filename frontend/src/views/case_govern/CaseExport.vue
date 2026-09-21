@@ -336,4 +336,10 @@ onMounted(async () => {
   padding: 16px !important;
   background: none !important;
 }
+
+/* 节点过长会撑开 .mind-content，透明区域经 html2canvas 截图会渲染成黑色；
+   显式给内容区白底，保证 PNG/PDF 导出颜色一致 */
+.case-export-page :deep(.mind-content) {
+  background: #ffffff;
+}
 </style>
