@@ -112,10 +112,35 @@ class MockAddon:
     def __init__(self, server: "MockApiServer"):
         self.server = server  # 持有对 MockApiServer 的弱引用以获取规则
 
+    def _apply_cors_headers(self, resp_headers: dict, flow: http.HTTPFlow) -> None:
+        """给 mock 响应补齐 CORS 头，避免浏览器跨域报错（CORS error）。
+
+        优先回显请求头里的 Origin；无 Origin 时用 *。同时允许常见的方法与请求头。
+        """
+        origin = flow.request.headers.get("Origin")
+        allow_origin = origin if origin else "*"
+        resp_headers.setdefault("Access-Control-Allow-Origin", allow_origin)
+        # 回显 Origin 时配合 credentials 需要 Vary，这里统一补上
+        resp_headers.setdefault("Vary", "Origin")
+        resp_headers.setdefault("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+        req_headers = flow.request.headers.get("Access-Control-Request-Headers")
+        allow_headers = req_headers if req_headers else "Content-Type, Authorization, X-Requested-With"
+        resp_headers.setdefault("Access-Control-Allow-Headers", allow_headers)
+        resp_headers.setdefault("Access-Control-Allow-Credentials", "true")
+        resp_headers.setdefault("Access-Control-Max-Age", "86400")
+
     def request(self, flow: http.HTTPFlow) -> None:
         """拦截请求，匹配规则并返回 mock 响应"""
         url = flow.request.pretty_url
         rules = self.server.get_rules()
+
+        # 跨域预检请求（OPTIONS）：直接返回 200 + CORS 头，避免透传导致预检失败
+        if flow.request.method == "OPTIONS":
+            cors_headers = {"Content-Type": "text/plain; charset=utf-8"}
+            self._apply_cors_headers(cors_headers, flow)
+            flow.response = http.Response.make(200, b"", cors_headers)
+            logger.info(f"[MockApi ✓] 处理 CORS 预检: {url}")
+            return
 
         for rule in rules:
             pattern = rule.get("url_pattern", "")
@@ -144,6 +169,8 @@ class MockAddon:
                 else:
                     resp_headers["Content-Type"] = "text/plain; charset=utf-8"
             resp_headers.setdefault("X-Mocked-By", "mitmproxy-mock-api")
+            # 补齐 CORS 头，避免网页端跨域拦截时报 CORS error
+            self._apply_cors_headers(resp_headers, flow)
 
             # 序列化 body
             if isinstance(response_body, (dict, list)):
