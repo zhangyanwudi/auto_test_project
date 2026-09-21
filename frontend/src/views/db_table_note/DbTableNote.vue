@@ -1312,7 +1312,11 @@ onMounted(async () => {
   font-size: 13px;
   line-height: 1.7;
   white-space: pre-wrap;
-  word-break: break-all;
+  /* 用 overflow-wrap: break-word 而非 break-all：
+     break-all 会在任意字符处断行，导致透明 textarea 与高亮 pre 层换行位置不一致，
+     长 SQL 后半段文字错位、无法正确选中（如 m ON m.id = r.id; 这一块） */
+  overflow-wrap: break-word;
+  word-break: normal;
   overflow: auto;
   tab-size: 4;
 }
