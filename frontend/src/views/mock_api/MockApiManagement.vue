@@ -36,12 +36,22 @@
       <template #header>
         <div class="card-head">
           <span>Mock 规则列表</span>
-          <el-button type="primary" size="small" @click="openRuleDialog()">新增规则</el-button>
+          <div class="head-right">
+            <el-input
+              v-model="keyword"
+              clearable
+              placeholder="搜索规则名称 / 拦截地址 / 备注"
+              :prefix-icon="Search"
+              class="search-input"
+              @input="onSearch"
+            />
+            <el-button type="primary" size="small" @click="openRuleDialog()">新增规则</el-button>
+          </div>
         </div>
       </template>
       <el-table
         v-loading="loading"
-        :data="list"
+        :data="filteredList"
         border
         stripe
         style="width: 100%"
@@ -140,9 +150,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { WarningFilled } from '@element-plus/icons-vue'
+import { WarningFilled, Search } from '@element-plus/icons-vue'
 import {
   getRules, createRule, updateRule, toggleRuleStatus, deleteRule,
   getProxyStatus,
@@ -153,6 +163,21 @@ const list = ref([])
 const saving = ref(false)
 const ruleDialogVisible = ref(false)
 const editingRuleId = ref(null)
+const keyword = ref('')
+
+/** 前端关键字搜索：匹配规则名称 / 拦截地址 / 备注 */
+const filteredList = computed(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return list.value
+  return list.value.filter((row) =>
+    [row.rule_name, row.url_pattern, row.remark]
+      .some((v) => String(v || '').toLowerCase().includes(kw))
+  )
+})
+
+function onSearch() {
+  // filteredList 由 computed 自动响应，无需额外处理
+}
 
 const proxyRunning = ref(false)
 const proxyPort = ref(8080)
@@ -308,9 +333,10 @@ async function fetchProxyStatus() {
 
 onMounted(() => {
   fetchRules()
-  fetchProxyStatus()
-  // 定时刷新状态，方便看到服务器侧代理是否在跑
-  statusTimer = setInterval(fetchProxyStatus, 10000)
+  // 代理状态放首屏之后延迟加载，避免端口探测阻塞页面展示
+  setTimeout(fetchProxyStatus, 300)
+  // 定时刷新状态，方便看到服务器侧代理是否在跑（间隔放宽到 30s，减少卡顿）
+  statusTimer = setInterval(fetchProxyStatus, 30000)
 })
 
 onUnmounted(() => {
@@ -330,6 +356,16 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-input {
+  width: 280px;
 }
 
 .proxy-card {

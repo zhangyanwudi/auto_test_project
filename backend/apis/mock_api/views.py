@@ -83,8 +83,8 @@ def _fail(msg, code=400, status=400):
 @require_http_methods(['GET'])
 @require_valid_token
 def mock_rule_list(request):
-    """Mock 规则列表（支持 ?status=1 过滤启用）"""
-    qs = ZMockApiRule.objects.all().order_by('sort_order', 'id')
+    """Mock 规则列表（支持 ?status=1 过滤启用；按 id 降序展示）"""
+    qs = ZMockApiRule.objects.all().order_by('-id')
     status_filter = request.GET.get('status')
     if status_filter in ('0', '1'):
         qs = qs.filter(status=int(status_filter))
@@ -362,7 +362,7 @@ def _is_port_listening(port, host='127.0.0.1'):
     import socket
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.5)
+            s.settimeout(0.2)  # 缩短超时，避免端口不通/防火墙 DROP 时阻塞过久
             return s.connect_ex((host, int(port))) == 0
     except OSError:
         return False
