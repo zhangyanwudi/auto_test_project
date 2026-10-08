@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS `z_case_govern_case_node` (
     `is_smoke`      TINYINT(1)      NOT NULL DEFAULT 0                  COMMENT '冒烟测试：1-冒烟用例，优先执行',
     `exec_result`   VARCHAR(16)     NOT NULL DEFAULT ''                 COMMENT '执行结果：pass-通过 fail-不通过 空-未执行',
     `collapsed`     TINYINT(1)      NOT NULL DEFAULT 0                  COMMENT '收起子节点：1-收起 0-展开',
-    `title`         VARCHAR(512)    NOT NULL                            COMMENT '节点文本',
+    `title`         TEXT            NOT NULL                            COMMENT '节点文本',
     `image`         LONGTEXT        NULL                                COMMENT '图片（base64 data URL，粘贴）',
     `sort_order`    INT UNSIGNED    NOT NULL DEFAULT 0                  COMMENT '同级排序（越小越靠前）',
     `create_time`   DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',

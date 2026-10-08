@@ -62,7 +62,7 @@ class ZCaseGovernCaseNode(models.Model):
         '收起子节点', default=False,
         help_text='True-收起子节点，False-展开',
     )
-    title = models.CharField('节点文本', max_length=512)
+    title = models.TextField('节点文本')
     image = models.TextField('图片', null=True, blank=True, default='', help_text='粘贴的图片（base64 data URL）')
     sort_order = models.IntegerField('排序', default=0)
     create_time = models.DateTimeField('创建时间', auto_now_add=True)

@@ -39,8 +39,8 @@
             <el-empty description="无匹配用例" :image-size="56" />
           </template>
           <el-table-column prop="id" label="ID" width="70" />
-          <el-table-column prop="case_name" label="用例名称" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="module" label="模块" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="case_name" label="用例名称" :width="colWidth('case_name', '用例名称', 120, 400)" show-overflow-tooltip />
+          <el-table-column prop="module" label="模块" :width="colWidth('module', '模块', 100, 300)" show-overflow-tooltip />
           <el-table-column label="优先级" width="90">
             <template #default="{ row }">
               <el-tag :type="priorityTagType(row.priority)" size="small">
@@ -56,9 +56,8 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="creator" label="创建人" min-width="130" show-overflow-tooltip />
-          <el-table-column prop="create_time" label="创建时间" min-width="170" show-overflow-tooltip />
-          <el-table-column prop="update_time" label="更新时间" min-width="170" show-overflow-tooltip />
+          <el-table-column prop="creator" label="创建人" :width="colWidth('creator', '创建人', 100, 300)" show-overflow-tooltip />
+          <el-table-column prop="update_time" label="更新时间" width="170" show-overflow-tooltip />
           <el-table-column label="操作" width="370" fixed="right">
             <template #default="{ row }">
               <el-button type="primary" size="small" @click="openMindEditor(row)">{{ isOwner(row) ? '设计用例' : '查看用例' }}</el-button>
@@ -279,6 +278,19 @@ function rowMatchesKeyword(row) {
 }
 
 const filteredList = computed(() => list.value.filter((row) => rowMatchesKeyword(row)))
+
+// 列宽自适应：取表头与所有单元格的最长内容，× 字符宽度后 clamp 到 [min, max]
+const COL_CHAR_WIDTH = 14
+function colWidth(field, label, min, max) {
+  let maxLen = String(label || '').length
+  for (const row of list.value) {
+    const v = row[field]
+    const len = v == null ? 0 : String(v).length
+    if (len > maxLen) maxLen = len
+  }
+  const w = Math.round(maxLen * COL_CHAR_WIDTH)
+  return Math.min(Math.max(w, min), max)
+}
 
 const form = reactive({
   case_name: '',
