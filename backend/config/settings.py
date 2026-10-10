@@ -251,7 +251,7 @@ OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'deepseek-r1:1.5b')
 # 可选视觉模型（需先 ollama pull），留空则使用 OCR 提取图片文字
 OLLAMA_VISION_MODEL = (os.environ.get('OLLAMA_VISION_MODEL') or '').strip() or ''
 OLLAMA_TIMEOUT_SECONDS = int(os.environ.get('OLLAMA_TIMEOUT_SECONDS', '120'))
-OLLAMA_NUM_CTX = int(os.environ.get('OLLAMA_NUM_CTX', '8192'))
+OLLAMA_NUM_CTX = int(os.environ.get('OLLAMA_NUM_CTX', '16384'))
 OLLAMA_TEMPERATURE = float(os.environ.get('OLLAMA_TEMPERATURE', '0.7'))
 OLLAMA_MAX_CONTEXT_MESSAGES = int(os.environ.get('OLLAMA_MAX_CONTEXT_MESSAGES', '50'))
 OLLAMA_DEFAULT_SYSTEM_PROMPT = '你是一个有帮助的AI助手，请用中文回答用户的问题。'

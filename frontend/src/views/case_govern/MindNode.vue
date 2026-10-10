@@ -137,18 +137,9 @@ const execTitle = computed(() => {
 })
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const childCount = computed(() => (Array.isArray(props.node.children) ? props.node.children.length : 0))
-// 节点标题每行最多显示的字符数，达到该字数才换行
-const TITLE_LINE_CHARS = 80
-const wrappedTitle = computed(() => {
-  const title = props.node.title || ''
-  if (!title) return '未命名'
-  const chars = Array.from(title)
-  const lines = []
-  for (let i = 0; i < chars.length; i += TITLE_LINE_CHARS) {
-    lines.push(chars.slice(i, i + TITLE_LINE_CHARS).join(''))
-  }
-  return lines.join('\n')
-})
+// 节点标题直接展示原文，换行交给 CSS 自然处理；
+// 避免在任意字符处硬切（如把「实验分类」这类词从中间断开）
+const wrappedTitle = computed(() => props.node.title || '未命名')
 const selected = computed(() => props.selectedId != null && props.node.id === props.selectedId)
 const isEditing = computed(() => props.editingId != null && props.node.id === props.editingId)
 const dropMode = computed(() => {
@@ -400,7 +391,10 @@ function onBlur() {
 .tcard-title {
   font-size: 13px;
   color: #303133;
-  white-space: pre-wrap;
+  white-space: pre-wrap;      /* 保留用户主动输入的换行 */
+  overflow-wrap: break-word; /* 超长时在单词/字符边界自然换行，不硬切中文词 */
+  word-break: normal;
+  max-width: 320px;          /* 限制标题最大宽度，避免无限撑开节点 */
   line-height: 1.4;
   flex-shrink: 0;
 }

@@ -732,10 +732,13 @@ def chat(request):
         # 远端网关使用完整的 build_system_prompt（含工具调用指令）
         if model_provider == 'local':
             # 精简版 system prompt：去掉复杂的 TOOL_CALL 指令，
-            # 仅保留基本角色描述，适配小模型的小上下文窗口
+            # 仅保留基本角色描述，适配小模型的小上下文窗口。
+            # 显式强调「结合上下文/记住前文」，缓解小模型多轮对话遗忘问题。
             system_prompt = (
                 '你是一个测试平台 AI 助手，可以帮助用户解答问题、分析文件内容。'
-                '请用中文回复。回复简洁明了。'
+                '请用中文回复，回复简洁明了。'
+                '重要：请始终结合本次对话中用户之前说过的内容进行回答；'
+                '用户追问或继续提问时，先回忆前面的对话再作答，不要当作全新问题。'
             )
         else:
             system_prompt = build_system_prompt()
@@ -765,16 +768,17 @@ def chat(request):
                 ollama_system = context_messages[0]['content']
                 ollama_messages = context_messages[1:]
 
-            # 本地模型上下文窗口有限（默认 8192 tokens），截断历史消息：
-            # 只保留最近 10 条，且总字符数不超过 20000（约 5000 tokens）
-            MAX_LOCAL_MESSAGES = 10
+            # 本地模型上下文窗口有限，截断历史消息：
+            # 只保留最近 N 条（N 取 settings.OLLAMA_MAX_CONTEXT_MESSAGES，默认 50），
+            # 且总字符数不超过上限（约 5000 tokens），始终保留「最后」的消息（最早的最先被丢弃）。
+            MAX_LOCAL_MESSAGES = int(getattr(settings, 'OLLAMA_MAX_CONTEXT_MESSAGES', 50) or 50)
             MAX_LOCAL_CHARS = 20000
             if len(ollama_messages) > MAX_LOCAL_MESSAGES:
                 ollama_messages = ollama_messages[-MAX_LOCAL_MESSAGES:]
                 logger.info('本地模型：历史消息截断至最近 %d 条', MAX_LOCAL_MESSAGES)
             total_chars = sum(len(m.get('content', '')) for m in ollama_messages)
             if total_chars > MAX_LOCAL_CHARS:
-                # 从最早的消息开始移除，直到总字符数在限制内
+                # 从最早的消息开始移除，直到总字符数在限制内（保留最后的消息）
                 trimmed = []
                 running = 0
                 for m in reversed(ollama_messages):
