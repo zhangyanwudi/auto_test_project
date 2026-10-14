@@ -300,7 +300,7 @@ def _build_tree(rows):
 @require_http_methods(['GET'])
 @require_valid_token
 def case_mind(request, pk):
-    """获取用例的思维导图树；无节点时返回默认根节点。"""
+    """获取用例的思维导图树；无节点时返回默认根节点。附带 version（乐观锁版本号）。"""
     try:
         c = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
@@ -325,11 +325,13 @@ def case_mind(request, pk):
             'image': '',
             'children': [],
         }
-    return JsonResponse({'code': 0, 'data': tree})
+    # 乐观锁版本号：用主表 update_time（微秒精度 ISO 字符串），保存时比对
+    version = c.update_time.isoformat() if c.update_time else ''
+    return JsonResponse({'code': 0, 'data': {'tree': tree, 'version': version}})
 
 
 def _normalize_node(node):
-    """规范化单个思维导图节点（标题/类型/子节点）。"""
+    """规范化单个思维导图节点（标题/类型/子节点），保留节点 id 供增量保存匹配。"""
     title = (node.get('title') or '').strip()
     if not title and not (node.get('image') or '').strip():
         title = '未命名'
@@ -343,6 +345,7 @@ def _normalize_node(node):
     if not isinstance(children, list):
         children = []
     return {
+        'id': node.get('id'),
         'title': title,
         'node_type': node_type,
         'is_smoke': bool(node.get('is_smoke')),
@@ -353,36 +356,100 @@ def _normalize_node(node):
     }
 
 
-def _replace_case_nodes(case_id, tree):
-    """在事务内全量替换用例的思维导图节点（tree 根节点已规范化，需在事务中调用）。"""
-    def _create(node, parent, sort):
+def _sync_case_nodes(case_id, tree):
+    """增量同步思维导图节点：按节点 id 更新/插入，删除提交中不存在的节点。
+
+    保证节点自增 id 跨保存稳定（多页签节点级合并的基础）。
+    tree 根节点已规范化，需在事务中调用。
+    """
+    def _upsert(node, parent, sort):
+        node_id = node.get('id')
         title = node.get('title') or ''
         if not title and not (node.get('image') or ''):
             title = '未命名'
-        n = ZCaseGovernCaseNode.objects.create(
-            case_id=case_id,
-            parent=parent,
-            node_type=node.get('node_type') or 'case',
-            is_smoke=bool(node.get('is_smoke')),
-            exec_result=node.get('exec_result') or '',
-            collapsed=bool(node.get('collapsed')),
-            title=title,
-            image=node.get('image') or '',
-            sort_order=sort,
-        )
+
+        if node_id:
+            try:
+                node_id = int(node_id)
+            except (TypeError, ValueError):
+                node_id = None
+
+        # 有 id 且属于该用例 → 更新；否则新建
+        n = None
+        if node_id:
+            try:
+                n = ZCaseGovernCaseNode.objects.get(case_id=case_id, id=node_id)
+            except ZCaseGovernCaseNode.DoesNotExist:
+                n = None
+
+        fields = {
+            'parent': parent,
+            'node_type': node.get('node_type') or 'case',
+            'is_smoke': bool(node.get('is_smoke')),
+            'exec_result': node.get('exec_result') or '',
+            'collapsed': bool(node.get('collapsed')),
+            'title': title,
+            'image': node.get('image') or '',
+            'sort_order': sort,
+        }
+        if n is None:
+            n = ZCaseGovernCaseNode.objects.create(case_id=case_id, **fields)
+        else:
+            for k, v in fields.items():
+                setattr(n, k, v)
+            n.save()
+
         for i, ch in enumerate(node.get('children') or []):
-            _create(ch, n, i)
+            _upsert(ch, n, i)
         return n
 
-    ZCaseGovernCaseNode.objects.filter(case_id=case_id).delete()
-    _create(tree, None, 0)
+    # 收集提交的所有节点 id（含新节点 None），用于删除「已被删除」的节点
+    submitted_ids = []
+    def _collect_ids(node):
+        node_id = node.get('id')
+        if node_id:
+            try:
+                submitted_ids.append(int(node_id))
+            except (TypeError, ValueError):
+                pass
+        for ch in node.get('children') or []:
+            _collect_ids(ch)
+
+    _collect_ids(tree)
+    # 删除数据库中该用例存在、但本次提交不存在的节点
+    ZCaseGovernCaseNode.objects.filter(case_id=case_id).exclude(id__in=submitted_ids).delete()
+
+    _upsert(tree, None, 0)
 
 
 @csrf_exempt
 @require_http_methods(['POST'])
 @require_valid_token
+def _fetch_tree_with_ids(case_id, case_name=''):
+    """读取用例思维导图树（含节点 id），供前端合并用。"""
+    rows = list(
+        ZCaseGovernCaseNode.objects.filter(case_id=case_id)
+        .order_by('sort_order', 'id')
+        .values('id', 'parent_id', 'node_type', 'is_smoke', 'exec_result', 'collapsed', 'title', 'image')
+    )
+    roots = _build_tree(rows)
+    if roots:
+        return roots[0]
+    return {
+        'id': None,
+        'parent_id': None,
+        'node_type': 'module',
+        'is_smoke': False,
+        'exec_result': '',
+        'collapsed': False,
+        'title': case_name or '用例',
+        'image': '',
+        'children': [],
+    }
+
+
 def case_mind_save(request, pk):
-    """保存思维导图：接收整棵树 JSON，事务内全量替换该用例的节点。"""
+    """保存思维导图：接收整棵树 JSON，事务内按节点 id 增量同步。"""
     try:
         case = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
@@ -398,12 +465,29 @@ def case_mind_save(request, pk):
     if not isinstance(tree, dict):
         return JsonResponse({'code': 400, 'message': '思维导图数据格式错误'}, status=400)
 
+    # 乐观锁：前端保存时带上加载到的 base_version（用例主表 update_time 的 ISO 串），
+    # 若与当前数据库中的 update_time 不一致，说明期间已被其他页签/用户修改，拒绝覆盖。
+    base_version = (body.get('base_version') or '').strip() if isinstance(body, dict) else ''
+    if base_version:
+        current_version = case.update_time.isoformat() if case.update_time else ''
+        if base_version != current_version:
+            # 冲突：返回服务器当前完整树（含节点 id + 最新 version），供前端三方合并
+            server_tree = _fetch_tree_with_ids(pk, case.case_name)
+            return JsonResponse({
+                'code': 409,
+                'message': '该用例已被其他人修改',
+                'data': {
+                    'server_tree': server_tree,
+                    'version': current_version,
+                },
+            }, status=409)
+
     with transaction.atomic():
-        _replace_case_nodes(pk, _normalize_node(tree))
+        _sync_case_nodes(pk, _normalize_node(tree))
         # 保存节点后同步刷新用例主表更新时间（auto_now 自动置为当前时间）
         case.save(update_fields=['update_time'])
 
-    return JsonResponse({'code': 0, 'message': '用例已保存'})
+    return JsonResponse({'code': 0, 'message': '用例已保存', 'data': {'version': case.update_time.isoformat() if case.update_time else ''}})
 
 
 @csrf_exempt

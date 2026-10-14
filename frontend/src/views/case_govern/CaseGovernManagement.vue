@@ -103,7 +103,20 @@
           />
         </el-form-item>
         <el-form-item label="创建人" prop="creator">
-          <el-input v-model="form.creator" placeholder="多个创建人用逗号分隔，如：张一一,张二二" />
+          <el-select
+            v-model="form.creator"
+            multiple
+            filterable
+            placeholder="选择创建人（可多选）"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.value"
+              :label="u.label"
+              :value="u.value"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="优先级" prop="priority">
           <el-radio-group v-model="form.priority">
@@ -199,6 +212,7 @@ import {
   fetchShareToken,
 } from '../../api/case_govern/caseGovern.js'
 import { getUserCnName, getUsername } from '../../common/request.js'
+import { fetchUserList } from '../../api/system/user.js'
 import MindMapEditor from './MindMapEditor.vue'
 import AiChatDialog from '../../components/AiChatDialog.vue'
 
@@ -212,11 +226,13 @@ const formRef = ref(null)
 const mindVisible = ref(false)
 const mindCase = ref(null)
 const mindDirty = ref(false)
+// 系统用户列表（供创建人多选下拉使用）
+const userOptions = ref([])
 // 模块配置（树型结构）：键为一级模块，值为其子模块列表；子模块为空数组表示仅可选择一级模块。
 // 在页面选择模块时，先展示一级模块，点击后再展开其子模块，最终按「一级模块--子模块」显示。
 const moduleConfig = {
   线索平台: ['线索库'],
-  达人基建: ['订单', '合同','结算明细','视频','投流','线索平台','权限'],
+  达人基建: ['达人','订单', '合同','结算明细','视频','投流','线索平台','权限'],
   其他: ['业务'],
 }
 const importInput = ref(null)
@@ -294,7 +310,7 @@ function colWidth(field, label, min, max) {
 
 const form = reactive({
   case_name: '',
-  creator: '',
+  creator: [],   // 创建人：多选数组（提交时 join 成逗号字符串）
   priority: 2,
   status: 1,
   description: '',
@@ -317,10 +333,30 @@ function moduleToPath(module) {
   return [m.slice(0, idx), m.slice(idx + 2)]
 }
 
+/** 加载系统用户列表（供创建人多选下拉） */
+async function loadUserOptions() {
+  try {
+    const res = await fetchUserList()
+    if (res && res.code === 0 && Array.isArray(res.data)) {
+      userOptions.value = res.data.map((u) => ({
+        value: u.user_cn_name || u.user_name,
+        label: u.user_cn_name || u.user_name,
+      }))
+    }
+  } catch {
+    userOptions.value = []
+  }
+}
+
+/** 把「已保存的创建人字符串」反解为多选数组（回显编辑框） */
+function creatorsToArray(creatorStr) {
+  return splitCreators(creatorStr)
+}
+
 function resetForm() {
   editingId.value = null
   form.case_name = ''
-  form.creator = ''
+  form.creator = []
   form.priority = 2
   form.status = 1
   form.description = ''
@@ -336,7 +372,8 @@ function onDialogClosed() {
 function openCreateDialog() {
   editingId.value = null
   resetForm()
-  form.creator = getUserCnName()
+  // 新建用例：创建人默认为当前登录用户（中文名优先，回退登录名）
+  form.creator = [getUserCnName() || getUsername()].filter(Boolean)
   dialogVisible.value = true
 }
 
@@ -344,7 +381,7 @@ function openEditDialog(row) {
   resetForm()
   editingId.value = row.id
   form.case_name = row.case_name
-  form.creator = row.creator || ''
+  form.creator = creatorsToArray(row.creator || '')
   form.priority = row.priority || 2
   form.description = row.description || ''
   form.image = row.image || ''
@@ -444,7 +481,7 @@ async function submitForm() {
     const payload = {
       case_name: form.case_name.trim(),
       module: (modulePath.value || []).join('--').trim(),
-      creator: form.creator.trim(),
+      creator: (form.creator || []).join(','),
       priority: form.priority,
       description: form.description.trim(),
       image: form.image || '',
@@ -580,6 +617,7 @@ async function onImportFileChange(e) {
 
 onMounted(() => {
   loadList()
+  loadUserOptions()
 })
 
 // 供 Home 的路由离开守卫调用：判断当前是否有未保存的思维导图修改

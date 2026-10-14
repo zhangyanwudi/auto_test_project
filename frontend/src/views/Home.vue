@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, markRaw, reactive, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw, reactive, nextTick, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
@@ -397,6 +397,16 @@ function onHomeResize() {
   homeBarChart?.resize()
   homeLineChart?.resize()
 }
+
+// 切换到其它菜单再返回首页时，首页 DOM 会因 v-if 销毁重建：
+// 此时需重新加载统计数据并重建图表实例，否则图表区域空白/数据不刷新。
+watch(activeMenu, (val) => {
+  if (val === 'home') {
+    nextTick(() => {
+      fetchHomeStats()
+    })
+  }
+})
 
 /** menu_code -> 侧栏选中时渲染的页面组件（与菜单管理里「前端路径」字段无运行时关联，前端路径仅库内备注） */
 const viewMap = {

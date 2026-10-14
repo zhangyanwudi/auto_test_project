@@ -130,6 +130,32 @@
         </div>
       </div>
     </div>
+
+    <!-- 冲突列表弹窗：合并时节点级冲突，逐条让用户选择保留哪边 -->
+    <el-dialog
+      v-model="conflictDialogVisible"
+      title="节点冲突，请选择保留哪个版本"
+      width="640px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+    >
+      <p class="conflict-hint">以下节点在其它页签也被修改了，请逐个选择保留「对方的修改」或「我的修改」：</p>
+      <div v-for="(c, idx) in conflictList" :key="idx" class="conflict-item">
+        <div class="conflict-node-title">节点：{{ c.title || '（无标题）' }}</div>
+        <el-radio-group v-model="c.choice">
+          <el-radio value="server">
+            对方（{{ c.serverTitle || '（已删除）' }}）
+          </el-radio>
+          <el-radio value="mine">
+            我的（{{ c.mineTitle || '（已删除）' }}）
+          </el-radio>
+        </el-radio-group>
+      </div>
+      <template #footer>
+        <el-button @click="conflictDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmConflictResolve">确认合并并保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -138,6 +164,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted, provide, nextTi
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bottom, Delete } from '@element-plus/icons-vue'
 import { fetchMindTree, saveMindTree, updateNodeExecResult } from '../../api/case_govern/caseGovern.js'
+import { mergeTrees } from './mergeUtils.js'
 import MindNode from './MindNode.vue'
 
 const NODE_TYPES = [
@@ -177,6 +204,14 @@ const editSnapshot = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
+// 乐观锁版本号：加载时从后端获取，保存时带上用于冲突检测
+const version = ref('')
+// 加载时的树快照（三方合并的 base），load 成功后深拷贝
+const baseSnapshot = ref(null)
+// 冲突列表弹窗
+const conflictDialogVisible = ref(false)
+const conflictList = ref([])
+const conflictPendingSave = ref(null)
 // 保存前已删除的节点记录（用于「撤销删除」恢复），保存成功后清空
 const deletedStack = ref([])
 const canUndoDelete = computed(() => deletedStack.value.length > 0)
@@ -625,7 +660,12 @@ provide('mindReadonly', props.readonly)
 provide('mindDrag', { dragSourceId, dropTargetId, dropMode })
 
 function serializeNode(node) {
+  // 节点 id：数据库已有节点带数字 id；前端新建的临时 id（n_xxx）序列化为 null 表示新建
+  const dbId = (typeof node.id === 'number' || (typeof node.id === 'string' && /^\d+$/.test(node.id)))
+    ? node.id
+    : null
   return {
+    id: dbId,
     title: node.title || '',
     node_type: node.node_type || 'case',
     is_smoke: !!node.is_smoke,
@@ -641,7 +681,9 @@ async function load() {
   try {
     const res = await fetchMindTree(props.caseId)
     if (res.code === 0 && res.data) {
-      const d = res.data
+      // 后端返回 { tree, version }（乐观锁版本号）
+      const d = res.data.tree || res.data
+      version.value = res.data.version || ''
       tree.id = d.id != null ? d.id : tree.id
       tree.title = d.title || ''
       tree.node_type = d.node_type || 'module'
@@ -655,6 +697,8 @@ async function load() {
       if (props.expandOnLoad) {
         setAllCollapsed(false)
       }
+      // 保存 base 快照（三方合并基准）
+      baseSnapshot.value = JSON.parse(JSON.stringify(serializeNode(tree)))
       notify()
     }
   } catch {
@@ -668,8 +712,12 @@ async function load() {
 async function onSave(silent = false) {
   saving.value = true
   try {
-    const res = await saveMindTree(props.caseId, serializeNode(tree))
+    const res = await saveMindTree(props.caseId, serializeNode(tree), version.value)
     if (res.code === 0) {
+      // 保存成功后更新本地乐观锁版本号（后端返回了最新 version）
+      if (res.data && res.data.version) {
+        version.value = res.data.version
+      }
       if (silent !== true) {
         ElMessage.success(res.message || '用例已保存')
       }
@@ -677,6 +725,9 @@ async function onSave(silent = false) {
       deletedStack.value = []
       emit('dirty-change', false)
       emit('saved')
+    } else if (res.code === 409) {
+      // 乐观锁冲突：用 base / server / mine 做三方合并
+      await handleMergeConflict(res)
     } else {
       ElMessage.error(res.message || '保存失败')
     }
@@ -685,6 +736,96 @@ async function onSave(silent = false) {
   } finally {
     saving.value = false
   }
+}
+
+/** 处理保存冲突：三方合并，冲突节点弹列表让用户逐条选择 */
+async function handleMergeConflict(res) {
+  const serverTree = res.data?.server_tree
+  if (!serverTree) {
+    // 后端没返回 server 树（异常），退化为简单提示
+    ElMessage.error(res.message || '该用例已被修改，请刷新后重试')
+    return
+  }
+  const base = baseSnapshot.value
+  const mine = serializeNode(tree)
+  const server = serverTree
+
+  const { mergedTree, conflicts } = mergeTrees(base, server, mine)
+
+  // 无冲突：直接用合并结果重新保存
+  if (!conflicts.length) {
+    // 应用合并结果到本地树
+    applyTreeToLocal(mergedTree)
+    await onSave(silent)
+    return
+  }
+
+  // 有冲突：弹冲突列表
+  conflictList.value = conflicts.map((c) => ({
+    ...c,
+    choice: 'mine', // 默认保留 mine（B 自己的）
+  }))
+  conflictDialogVisible.value = true
+  conflictPendingSave.value = { mergedTree }
+}
+
+/** 把合并后的树应用回本地响应式 tree */
+function applyTreeToLocal(node, target = tree) {
+  target.id = node.id != null ? node.id : target.id
+  target.title = node.title || ''
+  target.node_type = node.node_type || 'case'
+  target.is_smoke = !!node.is_smoke
+  target.exec_result = node.exec_result || ''
+  target.collapsed = !!node.collapsed
+  target.image = node.image || ''
+  target.children = (node.children || []).map((ch) => {
+    const child = newNode('', 'case')
+    applyTreeToLocal(ch, child)
+    return child
+  })
+}
+
+/** 冲突列表确认：把用户选择应用到合并树，再重新保存 */
+async function confirmConflictResolve() {
+  if (!conflictPendingSave.value) return
+  const { mergedTree } = conflictPendingSave.value
+
+  // 根据用户在冲突列表中的选择，替换合并树里对应节点内容
+  const replaceNodeById = (node, id, chosenNode) => {
+    if (node.id === id) {
+      if (chosenNode == null) {
+        // 选择「删除」（chosenNode 为 null）
+        return null
+      }
+      node.title = chosenNode.title || ''
+      node.node_type = chosenNode.node_type || 'case'
+      node.is_smoke = !!chosenNode.is_smoke
+      node.exec_result = chosenNode.exec_result || ''
+      node.collapsed = !!chosenNode.collapsed
+      node.image = chosenNode.image || ''
+      node.children = (chosenNode.children || []).map((ch) => {
+        const c = { id: ch.id, title: ch.title || '', node_type: ch.node_type || 'case', is_smoke: !!ch.is_smoke, exec_result: ch.exec_result || '', collapsed: !!ch.collapsed, image: ch.image || '', children: [] }
+        return c
+      })
+      return node
+    }
+    node.children = (node.children || []).map((ch) => replaceNodeById(ch, id, chosenNode)).filter(Boolean)
+    return node
+  }
+
+  // 按冲突列表的 choice 应用
+  for (const c of conflictList.value) {
+    const chosenNode = c.choice === 'server' ? c.serverNode : (c.choice === 'mine' ? c.mineNode : null)
+    replaceNodeById(mergedTree, c.id, chosenNode)
+  }
+
+  // 应用合并结果到本地树
+  applyTreeToLocal(mergedTree)
+  conflictDialogVisible.value = false
+  conflictPendingSave.value = null
+
+  // 用最新 version 重新保存
+  await onSave()
 }
 
 function onBack() {
@@ -982,5 +1123,26 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.conflict-hint {
+  font-size: 13px;
+  color: #909399;
+  margin: 0 0 12px;
+}
+
+.conflict-item {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.conflict-node-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
+  word-break: break-all;
 }
 </style>

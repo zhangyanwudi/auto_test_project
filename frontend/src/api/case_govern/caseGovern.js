@@ -49,17 +49,17 @@ export async function verifyShareToken(token) {
   return res.json()
 }
 
-/** 获取用例的思维导图树 */
+/** 获取用例的思维导图树（返回 { tree, version }） */
 export async function fetchMindTree(id) {
   const res = await requestWithToken(`${BASE}/cases/${id}/mind/`)
   return res.json()
 }
 
-/** 保存思维导图（整棵树全量替换） */
-export async function saveMindTree(id, tree) {
+/** 保存思维导图（整棵树全量替换，带 base_version 做乐观锁校验） */
+export async function saveMindTree(id, tree, baseVersion = '') {
   const res = await requestWithToken(`${BASE}/cases/${id}/mind/save/`, {
     method: 'POST',
-    body: JSON.stringify({ tree }),
+    body: JSON.stringify({ tree, base_version: baseVersion }),
   })
   return res.json()
 }
