@@ -422,9 +422,6 @@ def _sync_case_nodes(case_id, tree):
     _upsert(tree, None, 0)
 
 
-@csrf_exempt
-@require_http_methods(['POST'])
-@require_valid_token
 def _fetch_tree_with_ids(case_id, case_name=''):
     """读取用例思维导图树（含节点 id），供前端合并用。"""
     rows = list(
@@ -448,6 +445,9 @@ def _fetch_tree_with_ids(case_id, case_name=''):
     }
 
 
+@csrf_exempt
+@require_http_methods(['POST'])
+@require_valid_token
 def case_mind_save(request, pk):
     """保存思维导图：接收整棵树 JSON，事务内按节点 id 增量同步。"""
     try:
