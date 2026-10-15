@@ -516,7 +516,11 @@ def case_node_exec(request, pk):
     node.save(update_fields=['exec_result', 'update_time'])
     # 同步刷新用例主表更新时间
     case.save(update_fields=['update_time'])
-    return JsonResponse({'code': 0, 'message': '执行结果已更新'})
+    return JsonResponse({
+        'code': 0,
+        'message': '执行结果已更新',
+        'data': {'version': case.update_time.isoformat() if case.update_time else ''},
+    })
 
 
 # 节点图片（base64 data URL）的 MIME 类型到文件扩展名映射

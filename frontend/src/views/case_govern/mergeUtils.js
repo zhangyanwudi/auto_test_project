@@ -113,6 +113,13 @@ export function mergeTrees(base, server, mine) {
     }
 
     // 两边都有
+    // 关键修复：b（base）可能为 undefined —— B 新增的节点（mine 有、base 无），
+    // 此时该节点 A 不可能改过，直接保留 mine（B 的），避免访问 b.title 报错。
+    if (!b) {
+      const out = cloneNode(m)
+      mergeChildren(out, s, m, key)
+      return out
+    }
     const serverChanged = !fieldsEqual(b, s)
     const mineChanged = !fieldsEqual(b, m)
     const serverMineSame = fieldsEqual(s, m)

@@ -316,7 +316,11 @@ function onExecResultChange(val) {
     return
   }
   updateNodeExecResult(props.caseId, node.id, val)
-    .then(() => {
+    .then((res) => {
+      // 标记执行结果会刷新主表 update_time，同步更新本地乐观锁版本号，避免下次保存误判冲突
+      if (res && res.data && res.data.version) {
+        version.value = res.data.version
+      }
       ElMessage.success(
         val === 'pass' ? '已标记为通过' : val === 'fail' ? '已标记为不通过' : '已重置为未执行',
       )
