@@ -752,11 +752,11 @@ async function handleMergeConflict(res) {
 
   const { mergedTree, conflicts } = mergeTrees(base, server, mine)
 
-  // 无冲突：直接用合并结果重新保存
+  // 无冲突：直接用合并结果重新保存（静默保存，避免重复弹成功提示）
   if (!conflicts.length) {
     // 应用合并结果到本地树
     applyTreeToLocal(mergedTree)
-    await onSave(silent)
+    await onSave(true)
     return
   }
 

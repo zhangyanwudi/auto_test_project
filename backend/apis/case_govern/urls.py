@@ -1,7 +1,8 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 urlpatterns = [
+    path('case_runner/', include('apis.case_govern.case_runner.urls')),
     path('modules/', views.module_list),
     path('cases/', views.case_list),
     path('cases/create/', views.case_create),

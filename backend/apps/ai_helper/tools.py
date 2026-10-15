@@ -224,6 +224,18 @@ TOOLS = [
             'file_id_2': '第二个上传文件的 file_id（从文件上传API返回中获取）',
         },
     },
+    {
+        'name': 'case_explore',
+        'description': (
+            '生成网页巡检规范并试运行。'
+            '用户用自然语言描述要巡检的页面和功能（如「巡检线索库页面，验证列表加载、搜索」），'
+            '该工具会：1) 生成节点规范草稿 2) 用 Playwright 无痕浏览器试运行 3) 返回每步执行结果。'
+            '仅在用户消息以「@生成巡检规范」或「@生成规范」开头时触发。'
+        ),
+        'parameters': {
+            'description': '用户对要巡检页面的自然语言描述，如「巡检 https://xxx 的线索库页面，验证列表加载和搜索功能」',
+        },
+    },
 ]
 
 
@@ -262,6 +274,11 @@ def build_system_prompt():
 - 用户消息 `@{key} iOS方块-AB3.5` → 等同于「@{display} iOS方块-AB3.5」
 - 如果后面跟了项目名，提取项目名；如果已上传 Excel 文档，立即调用 {key} 工具
 - 如果没有项目名也没有上传文档，提示用户提供项目名和上传文档""")
+        elif key == 'case-explore':
+            trigger_lines.append(f"""### @{key} / @{display} — {display}
+
+接收 `@{key}` 或 `@{display}` 命令，把命令前缀后的内容作为「要巡检页面的自然语言描述」，
+立即调用 case_explore 工具（description 参数为该描述）。""")
         else:
             trigger_lines.append(f"""### @{key} / @{display} — 执行{display}
 

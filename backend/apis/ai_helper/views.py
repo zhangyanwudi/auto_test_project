@@ -668,6 +668,41 @@ def _extract_hot_update_params_from_conversation(conv):
     return project, file_id
 
 
+def _format_case_explore_report(result):
+    """把巡检试运行结果格式化成给用户看的报告文本。"""
+    spec = result.get('spec') or ''
+    error = result.get('error')
+    steps = result.get('steps') or []
+    passed = result.get('passed', 0)
+    failed = result.get('failed', 0)
+    total = result.get('total', 0)
+
+    lines = []
+    lines.append('📋 巡检规范草稿')
+    lines.append(spec)
+    lines.append('')
+
+    if error:
+        lines.append(f'❌ 试运行失败：{error}')
+        return '\n'.join(lines)
+
+    lines.append(f'🧪 试运行结果：通过 {passed} / 失败 {failed} / 共 {total} 步')
+    lines.append('')
+    for s in steps:
+        icon = '✅' if s.get('status') == 'pass' else '❌'
+        node = s.get('node_title') or ''
+        msg = s.get('message') or ''
+        cost = s.get('cost_ms', 0)
+        lines.append(
+            f"{icon} 步骤{s.get('index')} [{s.get('action')}] {node} —— "
+            f"{'通过' if s.get('status') == 'pass' else '失败'}（{cost}ms）"
+            + (f'：{msg}' if msg and s.get('status') != 'pass' else '')
+        )
+    lines.append('')
+    lines.append('👉 回复「确认固化」将该规范保存为用例；或重新发送 @生成巡检规范 重新生成。')
+    return '\n'.join(lines)
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 @require_valid_token
@@ -886,6 +921,19 @@ def chat(request):
             reply = _execute_single_hot_update_test(
                 tool_params, reply, context_messages
             )
+
+        elif tool_name == 'case_explore' and tool_params:
+            # 生成巡检规范 + 试运行
+            description = tool_params.get('description', '')
+            try:
+                from apps.case_govern.case_runner.runner import run_explore
+                explore_result = run_explore(description)
+                reply = _format_case_explore_report(explore_result)
+                logger.info('巡检试运行完成: passed=%s failed=%s',
+                            explore_result.get('passed'), explore_result.get('failed'))
+            except Exception as e:  # noqa: BLE001
+                logger.error('巡检试运行失败: %s', e)
+                reply = f'❌ 巡检试运行失败：{e}'
 
         elif not is_at_command and _is_in_hot_update_flow(conv):
             # ★ 关键修复：AI 没有生成 TOOL_CALL，但对话处于热更测试流程中。
