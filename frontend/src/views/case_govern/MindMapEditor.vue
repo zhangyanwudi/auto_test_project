@@ -280,7 +280,11 @@ function finishEdit(id) {
   if (id != null && editingId.value !== id) return
   editingId.value = null
   selectedId.value = null
-  if (dirty.value) {
+  // 仅当节点标题真正发生变化时才自动保存；
+  // 避免「新增空节点后直接失焦（未输入任何内容）」也触发保存，导致连续加节点一直保存。
+  const node = findNode(tree, id)
+  const titleChanged = node && (node.title || '') !== (editSnapshot.value || '')
+  if (titleChanged && dirty.value) {
     onSave(true)
   }
 }
@@ -350,6 +354,7 @@ function addChild(id) {
   parent.children.push(child)
   selectedId.value = child.id
   editingId.value = child.id
+  editSnapshot.value = ''  // 新节点标题快照为空，用于 finishEdit 判断是否真的改过标题
   markDirty()
   notify()
 }
@@ -364,6 +369,7 @@ function addSibling(id) {
   parent.children.splice(idx + 1, 0, sibling)
   selectedId.value = sibling.id
   editingId.value = sibling.id
+  editSnapshot.value = ''  // 新节点标题快照为空
   markDirty()
   notify()
 }
