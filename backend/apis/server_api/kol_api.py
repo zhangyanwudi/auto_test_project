@@ -24,6 +24,12 @@ class KolEnum:
         ZnYan_kol="M915BFH9KV"
         ZnYan = "1215BBPJ21"
 
+    class Domain(str, Enum):
+        """set_auth 注入登录态的目标站点域名。"""
+        MARKETING_TEST = "https://marketing-test.youxi123.com"
+        # MARKETING_DEV1 = "https://marketing-dev1.youxi123.com"
+        # MI_TEST = "https://mi-test.youxi123.com"
+
 
 class KolsysApi(KolEnum):
     # 用户邮箱
@@ -80,57 +86,60 @@ class KolsysApi(KolEnum):
         print(f"claims:{info.claims}")
         print(f"user:{info.user}")
         if is_set_cache:
-            from base_utils.push_auth import set_auth
-            try:
-                domains = [
-                    # "https://marketing-dev1.youxi123.com",
-                    "https://marketing-test.youxi123.com",
-                    # "https://mi-test.youxi123.com"
-                ]
-                for domain in domains:
-                    mi_web_user_Info = {
-                        "id": "6a8572473e6bc20157c92afb",
-                        "username": "zhangyan02195",
-                        "email": "zhangyan02195@hungrystudio.com",
-                        "workcode": "001217",
-                        "full_name": "张岩",
-                        "avatar": "",
-                        "sso_id": "1322625860778633",
-                        "privileges": {
-                            "ADS_CREATE:ALL": True,
-                            "ASA_REPORT:EXPORT_REPORT": True,
-                            "ASSET_BENCHMARK:EXPORT_REPORT": True,
-                            "ASSET_REPORT:EXPORT_REPORT": True,
-                            "BOARD_BENCHMARK:UPDATE_BOARD_BENCHMARK": True,
-                            "BOARD_TEMPLATE:CREATE_PUBLIC_TEMPLATE": True,
-                            "KOL_VIDEO_EFFECT:EXPORT_REPORT": True,
-                            "ROI_REPORT:EXPORT_REPORT": True
-                        }
-                    }
-                    mi_web_user_Info['id'] = data.get("user").get("id")
-                    mi_web_user_Info['username'] = data.get("user").get("username")
-                    mi_web_user_Info['email'] = data.get("user").get("email")
-                    mi_web_user_Info['workcode'] = data.get("user").get("workcode")
-                    mi_web_user_Info['full_name'] = data.get("user").get("full_name")
-                    set_auth(
-                        domain=domain,
-                        cache_type="localStorage",
-                        values={
-                            "kolUserName": data.get("user").get("username"),
-                            "kolTicket": data.get("user").get("id"),
-                            "kol_token": self.default_token,
-                            "kolEmail": data.get("user").get("email"),
-                            "kolFullName": data.get("user").get("full_name"),
-                            "mi_web_user_Info": mi_web_user_Info,
-                            # 前端对 mi_web_user_token 用 JSON.stringify 存 / JSON.parse 读，
-                            # 因此这里也必须存成「带引号的 JSON 字符串」，否则前端 parse 失败导致未登录
-                            "mi_web_user_token": json.dumps(self.default_token),
-                        }
-                    )
-                logger.info(f"【{user_email}】缓存设置成功！")
-            except Exception as e:
-                logger.error(f"设置缓存异常，{e}")
+            self._set_user_cache(user_email, data)
         return True, info
+
+    def _build_mi_web_user_info(self, user: dict) -> dict:
+        """组装 mi_web_user_Info（含固定特权位），并用接口返回的用户信息覆盖 id/username 等字段。"""
+        return {
+            "id": user.get("id"),
+            "username": user.get("username"),
+            "email": user.get("email"),
+            "workcode": user.get("workcode"),
+            "full_name": user.get("full_name"),
+            "avatar": "",
+            "sso_id": "1322625860778633",
+            "privileges": {
+                "ADS_CREATE:ALL": True,
+                "ASA_REPORT:EXPORT_REPORT": True,
+                "ASSET_BENCHMARK:EXPORT_REPORT": True,
+                "ASSET_REPORT:EXPORT_REPORT": True,
+                "BOARD_BENCHMARK:UPDATE_BOARD_BENCHMARK": True,
+                "BOARD_TEMPLATE:CREATE_PUBLIC_TEMPLATE": True,
+                "KOL_VIDEO_EFFECT:EXPORT_REPORT": True,
+                "ROI_REPORT:EXPORT_REPORT": True,
+            },
+        }
+
+    def _set_user_cache(self, user_email: str, data: dict):
+        """把 token 接口返回的登录态注入浏览器 localStorage（is_set_cache=True 时调用）。
+
+        :param user_email: 用户邮箱（仅用于日志）
+        :param data:       token 接口返回的 data 字段
+        """
+        from base_utils.push_auth import set_auth
+        user = data.get("user") or {}
+        try:
+            for domain in self.Domain:
+                mi_web_user_info = self._build_mi_web_user_info(user)
+                set_auth(
+                    domain=domain.value,
+                    cache_type="localStorage",
+                    values={
+                        "kolUserName": user.get("username"),
+                        "kolTicket": user.get("id"),
+                        "kol_token": self.default_token,
+                        "kolEmail": user.get("email"),
+                        "kolFullName": user.get("full_name"),
+                        "mi_web_user_Info": mi_web_user_info,
+                        # 前端对 mi_web_user_token 用 JSON.stringify 存 / JSON.parse 读，
+                        # 因此这里也必须存成「带引号的 JSON 字符串」，否则前端 parse 失败导致未登录
+                        "mi_web_user_token": json.dumps(self.default_token),
+                    },
+                )
+            logger.info(f"【{user_email}】缓存设置成功！")
+        except Exception as e:
+            logger.error(f"设置缓存异常，{e}")
 
     # ── 以下为「纯函数扩展」：不影响原有方法，供 Playwright 巡检执行器注入登录态使用 ──
 

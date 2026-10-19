@@ -18,7 +18,7 @@
       v-else
       :case-id="caseId"
       :case-name="caseName"
-      readonly
+      :readonly="!canEdit"
       expand-on-load
       :show-back="false"
       @saved="() => {}"
@@ -38,6 +38,7 @@ const route = useRoute()
 const router = useRouter()
 const caseId = ref(null)
 const caseName = ref('')
+const canEdit = ref(false)
 const dirty = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
@@ -54,6 +55,7 @@ async function loadByToken() {
     if (res.code === 0 && res.data) {
       caseId.value = res.data.case_id
       caseName.value = res.data.case_name || ''
+      canEdit.value = !!res.data.can_edit
     } else {
       errorMsg.value = res.message || '分享链接无效或已过期'
     }

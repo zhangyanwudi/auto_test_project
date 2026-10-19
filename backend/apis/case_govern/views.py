@@ -188,7 +188,14 @@ def case_share_verify(request):
         c = ZCaseGovernCase.objects.get(pk=case_id)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
-    return JsonResponse({'code': 0, 'data': {'case_id': c.id, 'case_name': c.case_name}})
+    # 当前用户是否为创建人之一：决定分享页是否开放编辑/标记权限（创建人为空视为所有人可编辑）
+    creators = _creator_names(c.creator)
+    can_edit = (not creators) or any(n in creators for n in _current_user_names(request))
+    return JsonResponse({'code': 0, 'data': {
+        'case_id': c.id,
+        'case_name': c.case_name,
+        'can_edit': can_edit,
+    }})
 
 
 @csrf_exempt
@@ -494,11 +501,15 @@ def case_mind_save(request, pk):
 @require_http_methods(['POST'])
 @require_valid_token
 def case_node_exec(request, pk):
-    """更新单个节点的执行结果（非创建人也可标记测试通过/不通过）。"""
+    """更新单个节点的执行结果（仅创建人可标记；非创建人只能查看）。"""
     try:
         case = ZCaseGovernCase.objects.get(pk=pk)
     except ZCaseGovernCase.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '用例不存在'}, status=404)
+    # 标记执行结果会刷新主表 update_time，属于写操作，仅创建人可执行
+    err = _require_owner(request, case, '标记执行结果')
+    if err:
+        return err
     body = _parse_body(request)
     if body is None:
         return JsonResponse({'code': 400, 'message': '请求体格式错误'}, status=400)

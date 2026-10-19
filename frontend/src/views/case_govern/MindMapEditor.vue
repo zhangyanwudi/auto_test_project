@@ -544,6 +544,8 @@ function toggleCollapse(id) {
 }
 
 async function toggleExecResult(id) {
+  // 只读（非创建人）只可查看，不允许标记执行结果
+  if (props.readonly) return
   const node = findNode(tree, id)
   if (!node) return
   const old = node.exec_result
