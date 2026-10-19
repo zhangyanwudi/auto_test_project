@@ -59,6 +59,7 @@ class KolsysApi(KolEnum):
         params = {"email": user_email}
         logger.info(f"获取用户 token，email=【{user_email}】")
         status, resp = my_get(url, headers=self.headers, params=params)
+        print(resp)
         if not status:
             return status, resp
         #
@@ -275,19 +276,67 @@ class KolsysApi(KolEnum):
             print(json.dumps(resp))
         return status, resp
 
+    def update_video(self,performance_id,video_link,sparkcode=''):
+        """
+        上传履约视频
+        :param performance_id:
+        :param video_link:
+        :param sparkcode:
+        :return:
+        """
+        url = self.kol_url + "/kol/api/videos/performance"
+        payload = {"performance_id": 923261148, "publish_time": "2026-10-16",
+                   "video_link": "https://www.tiktok.com/@tahia.touch/video/7696817135573552406",
+                   "sparkcode": "#03ZQOY89388APKUhpDMxapfWX1lVc/GzwOd856py2h6WTgQ2dMGjOlM3xbAxfwk=",
+                   "confirm_overissue": False}
+
+    def get_performances_order_details(self,order_id):
+        """
+        获取履约订单详情
+        :param order_id:
+        :return:
+        """
+        url = self.kol_url + f"/kol/api/performances/orders/{order_id}"
+        status, resp = my_get(url, headers=self.headers)
+        if not status:
+            return status, resp
+        order_info = resp.get("order")
+        # print(json.dumps(order_info,indent=2))
+        return status, order_info
+
+    def query_kol_users(self,count:int=10):
+        """获取达人列表数据"""
+        url = self.kol_url + "/kol/resource/query"
+        payload = {"page":1,"count":count,"kol_regions":[],"regions":[],"languages":[],"media_sources":[],"genders":[],"kol_types":[],"users":[],"creators":[],"res_id":"","kol_name":"","expert_tag_ids":[],"discount_tag_ids":[],"contact":"","media_name":"","range":[],"order_start_date":"","order_end_date":""}
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
+
+        if not status:
+            return status, resp
+        code = resp.get("code")
+
+        if code != 0:
+            return False, resp
+
+        users_info=resp.get("data").get("resources")
+        # print(json.dumps(users_info, indent=2))
+        return status, users_info
+
+
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     # user_email = "xiaojiaqi@hungrystudio.com"    # 组员
     user_email='liuli@hungrystudio.com'   # 组员
-    # user_email = "zhangyan02195@hungrystudio.com"  # 管理员
+    user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长
     # user_email='licongze@hungrystudio.com'
-    user_email='wangyaoying@hungrystudio.com'
-    # user_email='lijingjing@hungrystudio.com'
+    # user_email='wangyaoying@hungrystudio.com'
+    # user_email='liyajun@hungrystudio.com'
     kolsys_api.get_user_token(user_email, is_set_cache=True)
+    # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")
+    # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.PersonKol.value,media_source_list=[KolEnum.Channel.Social_tiktok.value])
     # kolsys_api.get_jp_regions()
     # kolsys_api.get_jp_cities(43)

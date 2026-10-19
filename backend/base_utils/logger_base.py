@@ -18,7 +18,7 @@ from base_utils.path_base import get_path, check_dirs, get_file_time, joint_path
 from base_utils.time_base import get_before
 
 # ---------- 日志目录 ----------
-_log_dir = joint_path(get_path(__file__, index=1), 'log')
+_log_dir = joint_path(get_path(__file__, index=1), 'logs')
 check_dirs(_log_dir)
 
 # ---------- 日志格式 ----------

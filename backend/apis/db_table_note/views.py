@@ -411,8 +411,10 @@ def note_save(request):
 MAX_QUERY_ROWS = 500
 # 允许执行的查询类语句
 _QUERY_KEYWORDS = ('SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN')
-# 允许执行的写操作语句（无 WHERE 时需前端确认后携带 force=true）
-_WRITE_KEYWORDS = ('UPDATE', 'DELETE')
+# 允许执行的写操作语句
+_WRITE_KEYWORDS = ('UPDATE', 'DELETE', 'INSERT')
+# 需要 WHERE 保护的写操作：删改已有数据时，无 WHERE 会全表生效，必须确认（force=true）
+_WHERE_REQUIRED_KEYWORDS = ('UPDATE', 'DELETE')
 
 
 def _strip_sql_noise(sql):
@@ -436,8 +438,8 @@ def sql_execute(request):
     """执行 SQL 并返回结果。
 
     - 查询类（SELECT/SHOW/DESCRIBE/EXPLAIN）：返回 { columns, rows, row_count, truncated }。
-    - 写操作（UPDATE/DELETE）：返回 { is_write, affected }；
-      若无 WHERE 条件，必须携带 force=true（前端已让用户确认）否则拒绝。
+    - 写操作（INSERT/UPDATE/DELETE）：返回 { is_write, affected }；
+      UPDATE/DELETE 无 WHERE 条件时必须携带 force=true（前端已让用户确认）否则拒绝。
 
     body: { connection_id, sql, force? }
     """
@@ -456,13 +458,13 @@ def sql_execute(request):
     first_word = (stripped.strip().split(None, 1) or [''])[0].upper()
     if first_word not in _QUERY_KEYWORDS + _WRITE_KEYWORDS:
         return JsonResponse(
-            {'code': 400, 'message': '仅支持 SELECT/SHOW/DESCRIBE/EXPLAIN 查询及 UPDATE/DELETE 操作'},
+            {'code': 400, 'message': '仅支持 SELECT/SHOW/DESCRIBE/EXPLAIN 查询及 INSERT/UPDATE/DELETE 操作'},
             status=400,
         )
 
     is_write = first_word in _WRITE_KEYWORDS
     force = body.get('force') in (True, 'true', '1', 1)
-    if is_write and not _has_where(sql) and not force:
+    if first_word in _WHERE_REQUIRED_KEYWORDS and not _has_where(sql) and not force:
         return JsonResponse(
             {'code': 400, 'message': '该语句没有 WHERE 条件，将影响全表数据，请确认后再执行'},
             status=400,
