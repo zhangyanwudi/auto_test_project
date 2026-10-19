@@ -956,7 +956,7 @@ function getSelectedSql() {
   return (noteForm.sqlRecords || '').slice(s, e).trim()
 }
 
-/** 判断 SQL 是否为写操作（UPDATE/DELETE），并检测有无 WHERE */
+/** 判断 SQL 是否为「无 WHERE 的删改操作」（UPDATE/DELETE，需二次确认） */
 function isWriteSql(sql) {
   const stripped = sql
     .replace(/--[^\n]*/g, ' ')
@@ -968,7 +968,7 @@ function isWriteSql(sql) {
   return !/\bWHERE\b/i.test(stripped)
 }
 
-/** 执行 SQL：优先执行选中的 SQL；写操作无 WHERE 时确认后再执行 */
+/** 执行 SQL：优先执行选中的 SQL；UPDATE/DELETE 无 WHERE 时确认后再执行（INSERT 直接执行） */
 async function runSql() {
   if (!currentConnId.value) return
   const sql = getSelectedSql()

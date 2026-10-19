@@ -21,8 +21,8 @@ class KolEnum:
         Social_tiktok = "Social_tiktok"
 
     class PersonID(str, Enum):
-        PersonKol="M915BFH9KV"
-        PersonKoc = "1215BBPJ21"
+        ZnYan_kol="M915BFH9KV"
+        ZnYan = "1215BBPJ21"
 
 
 class KolsysApi(KolEnum):
@@ -337,6 +337,6 @@ if __name__ == "__main__":
     kolsys_api.get_user_token(user_email, is_set_cache=True)
     # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")
     # kolsys_api.query_kol_users()
-    # kolsys_api.create_order(res_id=KolEnum.PersonID.PersonKol.value,media_source_list=[KolEnum.Channel.Social_tiktok.value])
+    # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
     # kolsys_api.get_jp_regions()
     # kolsys_api.get_jp_cities(43)

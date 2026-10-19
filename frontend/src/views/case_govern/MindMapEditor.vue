@@ -556,7 +556,12 @@ async function toggleExecResult(id) {
   const isPersisted = typeof id === 'number' || /^\d+$/.test(String(id))
   if (isPersisted) {
     try {
-      await updateNodeExecResult(props.caseId, id, next)
+      const res = await updateNodeExecResult(props.caseId, id, next)
+      // 该接口会刷新用例主表 update_time，须同步最新乐观锁版本号；
+      // 否则下一次保存会带着过期 version 被误判 409，进而可能触发合并死循环。
+      if (res && res.data && res.data.version) {
+        version.value = res.data.version
+      }
       ElMessage.success(
         next === 'pass' ? '已标记为通过' : next === 'fail' ? '已标记为不通过' : '已重置为未执行',
       )
@@ -719,8 +724,29 @@ async function load() {
   emit('loaded')
 }
 
+// 保存串行化队列：连续快速编辑（如连续加节点后自动保存）会并发触发多次 onSave，
+// 若各自带着旧的 base_version 并发提交，后端乐观锁会判 409，进而陷入「合并→重存→又 409」死循环，
+// 导致保存按钮一直转圈。用队列把保存串起来，保证每次提交都带上前一次保存后的最新 version。
+let saveChain = Promise.resolve()
+let savePending = 0
+
 async function onSave(silent = false) {
+  savePending += 1
   saving.value = true
+  const prev = saveChain
+  saveChain = prev
+    .then(() => doSave(silent))
+    .finally(() => {
+      savePending -= 1
+      if (savePending <= 0) {
+        savePending = 0
+        saving.value = false
+      }
+    })
+  await saveChain
+}
+
+async function doSave(silent = false) {
   try {
     const res = await saveMindTree(props.caseId, serializeNode(tree), version.value)
     if (res.code === 0) {
@@ -736,15 +762,17 @@ async function onSave(silent = false) {
       emit('dirty-change', false)
       emit('saved')
     } else if (res.code === 409) {
-      // 乐观锁冲突：用 base / server / mine 做三方合并
+      // 乐观锁冲突：先同步服务器返回的最新 version，再三方合并。
+      // 否则 handleMergeConflict 里重新保存时仍带旧 base_version，会再次 409，形成死循环。
+      if (res.data && res.data.version) {
+        version.value = res.data.version
+      }
       await handleMergeConflict(res)
     } else {
       ElMessage.error(res.message || '保存失败')
     }
   } catch (e) {
     ElMessage.error(e.message || '保存失败')
-  } finally {
-    saving.value = false
   }
 }
 
@@ -766,7 +794,9 @@ async function handleMergeConflict(res) {
   if (!conflicts.length) {
     // 应用合并结果到本地树
     applyTreeToLocal(mergedTree)
-    await onSave(true)
+    // 当前已在保存队列内部（doSave 调用链上），直接串行重存；
+    // 若再走 onSave 入队会 await 到包含当前任务的 saveChain，导致自等待死锁。
+    await doSave(true)
     return
   }
 
@@ -834,8 +864,8 @@ async function confirmConflictResolve() {
   conflictDialogVisible.value = false
   conflictPendingSave.value = null
 
-  // 用最新 version 重新保存
-  await onSave()
+  // 用最新 version 重新保存（与 handleMergeConflict 无冲突分支一致，直接串行重存）
+  await doSave()
 }
 
 function onBack() {
