@@ -569,20 +569,32 @@ def _applescript_activate_tab(domain: str) -> bool:
     """遍历浏览器所有窗口的所有标签页，激活第一个 URL 含 domain 的标签页。
 
     返回是否找到并激活。
+
+    注意：AppleScript 里 `repeat with t in tabs of w` 得到的是引用，
+    不能直接 `index of t` / `URL of t` 取值（会报 -10006），
+    必须用 `tab i of w` 这种按下标索引的写法。
     """
-    # AppleScript 遍历所有窗口的所有标签，找到第一个 URL 含 domain 的
     script = (
         f'tell application "{BROWSER_APP_NAME}"\n'
+        "set found to false\n"
         "repeat with w in windows\n"
-        "  repeat with t in tabs of w\n"
+        "  set tabCount to count of tabs of w\n"
+        "  repeat with i from 1 to tabCount\n"
+        "    set t to tab i of w\n"
         f'    if "{domain}" is in (URL of t) then\n'
-        "      set active tab index of w to (index of t)\n"
+        "      set active tab index of w to i\n"
         "      set index of w to 1\n"
-        '      return "found"\n'
+        "      set found to true\n"
+        "      exit repeat\n"
         "    end if\n"
         "  end repeat\n"
+        "  if found then exit repeat\n"
         "end repeat\n"
-        'return "notfound"\n'
+        'if found then\n'
+        '  return "found"\n'
+        'else\n'
+        '  return "notfound"\n'
+        'end if\n'
         "end tell"
     )
     result = _applescript_run(script)

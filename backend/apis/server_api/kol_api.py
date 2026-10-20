@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+from urllib.parse import urlparse
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 from base_utils.api_base import my_get, my_post
@@ -26,9 +27,9 @@ class KolEnum:
 
     class Domain(str, Enum):
         """set_auth 注入登录态的目标站点域名。"""
-        MARKETING_TEST = "https://marketing-test.youxi123.com"
-        # MARKETING_DEV1 = "https://marketing-dev1.youxi123.com"
-        # MI_TEST = "https://mi-test.youxi123.com"
+        KOL_TEST = "https://marketing-test.youxi123.com"
+        KOL_DEV1 = "https://marketing-dev1.youxi123.com"
+        MI_TEST = "https://mi-test.youxi123.com"
 
 
 class KolsysApi(KolEnum):
@@ -54,11 +55,14 @@ class KolsysApi(KolEnum):
     def get_user_token(self,
                        user_email: str,
                        is_set_cache: bool = False,
+                       domain: str = "",
                        ):
         """
         获取用户token
         :param user_email:      用户邮箱
         :param is_set_cache:    是否设置浏览器缓存   True-设置，False-不设置
+        :param domain:          要设置缓存的域名（须在 KolEnum.Domain 内）；
+                                为空时设置 Domain 枚举中的全部域名
         :return:
         """
         url = self.mi_url + "/api/iam/users/token"
@@ -86,7 +90,7 @@ class KolsysApi(KolEnum):
         print(f"claims:{info.claims}")
         print(f"user:{info.user}")
         if is_set_cache:
-            self._set_user_cache(user_email, data)
+            self._set_user_cache(user_email, data, domain=domain)
         return True, info
 
     def _build_mi_web_user_info(self, user: dict) -> dict:
@@ -111,19 +115,32 @@ class KolsysApi(KolEnum):
             },
         }
 
-    def _set_user_cache(self, user_email: str, data: dict):
+    def _set_user_cache(self, user_email: str, data: dict, domain: str = ""):
         """把 token 接口返回的登录态注入浏览器 localStorage（is_set_cache=True 时调用）。
 
         :param user_email: 用户邮箱（仅用于日志）
         :param data:       token 接口返回的 data 字段
+        :param domain:     要设置的域名；为空时设置 Domain 枚举中的全部域名
         """
         from base_utils.push_auth import set_auth
         user = data.get("user") or {}
+        # 目标域名列表：显式传入则只设置该域名（须在枚举内），否则设置全部枚举域名
+        domain = (domain or "").strip()
+        if domain:
+            if domain not in {d.value for d in self.Domain}:
+                logger.warning(f"忽略不在枚举内的域名：{domain}")
+                return
+            targets = [domain]
+        else:
+            targets = [d.value for d in self.Domain]
         try:
-            for domain in self.Domain:
+            for target in targets:
+                # Domain 枚举存的是完整 URL（https://...），push_auth 内部按 host 匹配标签页，
+                # 这里统一转为纯 host（如 marketing-test.youxi123.com）传入
+                host = urlparse(target).netloc or target
                 mi_web_user_info = self._build_mi_web_user_info(user)
                 set_auth(
-                    domain=domain.value,
+                    domain=host,
                     cache_type="localStorage",
                     values={
                         "kolUserName": user.get("username"),
@@ -335,15 +352,15 @@ class KolsysApi(KolEnum):
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     # user_email = "xiaojiaqi@hungrystudio.com"    # 组员
-    user_email='liuli@hungrystudio.com'   # 组员
+    # user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
-    # user_email = "guosiyi@hungrystudio.com"  #审核员
+    user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长
     # user_email='licongze@hungrystudio.com'
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
-    kolsys_api.get_user_token(user_email, is_set_cache=True)
+    kolsys_api.get_user_token(user_email, is_set_cache=True,domain=KolEnum.Domain.KOL_TEST)
     # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
