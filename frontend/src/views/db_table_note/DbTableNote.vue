@@ -95,27 +95,16 @@
                   <div
                     v-for="row in filteredFields(t)"
                     :key="row.name"
-                    class="field-row"
+                    class="field-item"
                   >
-                    <div class="field-row-head" @click="toggleFieldOpen(t, row)">
-                      <span class="field-name" :title="row.name">{{ row.name }}</span>
-                      <span class="field-summary" :title="fieldSummary(row)">
-                        {{ fieldSummary(row) || '（无备注）' }}
-                      </span>
-                      <el-icon class="field-open-icon" :class="{ 'is-open': isFieldOpen(t, row) }">
-                        <ArrowRight v-if="!isFieldOpen(t, row)" />
-                        <ArrowDown v-else />
-                      </el-icon>
-                    </div>
-                    <div v-if="isFieldOpen(t, row)" class="field-edit">
-                      <el-input
-                        v-model="row.manual"
-                        type="textarea"
-                        :rows="4"
-                        :placeholder="row.comment ? '数据库注释：' + row.comment : '补充备注，支持多行（如枚举值逐条换行）'"
-                        @input="onFieldInput(t)"
-                      />
-                    </div>
+                    <div class="field-name" :title="row.name">{{ row.name }}</div>
+                    <el-input
+                      v-model="row.manual"
+                      type="textarea"
+                      :rows="3"
+                      :placeholder="row.comment ? '数据库注释：' + row.comment : '补充备注，支持多行（如枚举值逐条换行）'"
+                      @input="onFieldInput(t)"
+                    />
                   </div>
                   <el-empty
                     v-if="!isFieldsLoading(t) && !filteredFields(t).length"
@@ -438,7 +427,6 @@ const fieldsMap = ref({})        // { table_name: [ {name, comment, manual} ] }
 const fieldsExpanded = ref({})   // { table_name: true }
 const fieldsLoadingMap = ref({}) // { table_name: true }
 const fieldKeywords = ref({})    // { table_name: 关键字 }
-const fieldOpenMap = ref({})     // { table_name: 当前展开编辑的字段名 }
 
 /* ---- 连接 ---- */
 const connDialogVisible = ref(false)
@@ -606,7 +594,6 @@ async function onConnChange() {
   fieldsExpanded.value = {}
   fieldsLoadingMap.value = {}
   fieldKeywords.value = {}
-  fieldOpenMap.value = {}
   dirtyFields.value = {}
   savedSqlSnapshot.value = ''
   savedFieldNotesSnapshot.value = ''
@@ -648,15 +635,6 @@ async function toggleTableFields(t) {
   }
 }
 
-/** 某字段备注摘要：取第一行非空内容，截断到约 40 字 */
-function fieldSummary(row) {
-  const text = (row.manual || '').trim() || (row.comment || '').trim()
-  if (!text) return ''
-  const firstLine = text.split(/\r?\n/)[0].trim()
-  if (firstLine.length > 40) return firstLine.slice(0, 40) + '…'
-  return firstLine
-}
-
 /** 字段列表搜索：按字段名或备注（手动 + 数据库注释）过滤 */
 function filteredFields(t) {
   const kw = (fieldKeywords.value[t.table_name] || '').trim().toLowerCase()
@@ -668,16 +646,6 @@ function filteredFields(t) {
     const comment = (row.comment || '').toLowerCase()
     return name.includes(kw) || manual.includes(kw) || comment.includes(kw)
   })
-}
-
-function isFieldOpen(t, row) {
-  return fieldOpenMap.value[t.table_name] === row.name
-}
-
-/** 点击字段行：同一张表内一次只展开一个字段的编辑区 */
-function toggleFieldOpen(t, row) {
-  const open = isFieldOpen(t, row)
-  fieldOpenMap.value[t.table_name] = open ? '' : row.name
 }
 
 async function loadFieldsForTable(tableName) {
@@ -1271,69 +1239,24 @@ onMounted(async () => {
   margin-bottom: 6px;
 }
 
-.field-row {
-  margin-bottom: 4px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  background: var(--el-fill-color-blank);
+.field-item {
+  margin-bottom: 8px;
 }
 
-.field-row:last-child {
+.field-item:last-child {
   margin-bottom: 0;
 }
 
-.field-row-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.field-row-head:hover {
-  background: var(--el-color-primary-light-9);
-}
-
 .field-name {
-  flex-shrink: 0;
-  max-width: 120px;
+  margin-bottom: 4px;
   font-family: 'SF Mono', 'JetBrains Mono', Consolas, Menlo, monospace;
   font-size: 12px;
   font-weight: 600;
   color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
 }
 
-.field-summary {
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.field-open-icon {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
-  transition: transform 0.15s;
-}
-
-.field-open-icon.is-open {
-  color: var(--el-color-primary);
-}
-
-.field-edit {
-  padding: 6px 8px 8px;
-  border-top: 1px dashed var(--el-border-color-lighter);
-}
-
-.field-edit :deep(.el-textarea__inner) {
+.field-item :deep(.el-textarea__inner) {
   font-size: 12px;
   line-height: 1.6;
 }
