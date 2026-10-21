@@ -2,7 +2,8 @@
 """
 巡检试运行编排：AI 生成规范 → Playwright 无痕执行 → 每步日志 → 报告。
 
-免登录版 MVP：不注入 token，直接访问免登录页面。
+执行前会拉取巡检账号（默认 zhangyan02195@***.com）的登录态注入 localStorage，
+避免访问需要 SSO 登录的页面（如 marketing-test.youxi123.com）时被重定向到登录页。
 """
 import json
 import re
@@ -10,6 +11,9 @@ import re
 from .prompts import build_explore_system_prompt, build_translate_prompt
 from .schema import parse_steps_json, validate_step
 from .step_logger import StepLogger
+
+# 巡检执行器注入登录态用的默认账号（拉取 token 时传的邮箱，须为完整真实邮箱）
+EXPLORE_ACCOUNT_EMAIL = "zhangyan02195@hungrystudio.com"
 
 
 def _call_ai(messages):
@@ -93,6 +97,54 @@ def _merge_steps_with_nodes(steps, nodes):
     return steps
 
 
+def _inject_explore_login(page, target_url):
+    """给巡检页面注入登录态（localStorage），避免访问 SSO 站点被重定向到登录页。
+
+    先打开目标域名建立一个同源页面（否则无法写 localStorage），再拉取巡检账号
+    的 token，把 7 个登录态 key 写进 localStorage，最后重新跳转到目标页面。
+    """
+    from urllib.parse import urlparse
+    from base_utils.logger_base import logger
+
+    host = (urlparse(target_url).netloc or '').strip()
+    if not host:
+        logger.warning('巡检登录态注入跳过：无法从 URL 解析域名 %s', target_url)
+        return
+
+    # 1. 先打开目标域名（任意路径），让浏览器建立该 origin 的页面
+    origin = f"https://{host}/"
+    try:
+        page.goto(origin, wait_until='domcontentloaded', timeout=30000)
+    except Exception as e:  # noqa: BLE001
+        logger.warning('巡检登录态注入：打开 %s 失败（继续尝试注入）：%s', origin, e)
+
+    # 2. 每次巡检都调用 get_user_token 拉取最新 token（该方法内部会用真实邮箱请求
+    #    iam 接口，拿到当前有效的 token 与用户信息），再组装成登录态注入 localStorage
+    try:
+        from apis.server_api.kol_api import KolsysApi
+        api = KolsysApi(is_debug=True)
+        ok, info = api.get_user_token(EXPLORE_ACCOUNT_EMAIL, is_set_cache=False)
+        if not ok:
+            logger.error('巡检登录态注入：获取 token 失败，跳过注入：%s', info)
+            return
+        values = api._build_auth_payload({'user': info.user})
+    except Exception as e:  # noqa: BLE001
+        logger.error('巡检登录态注入：获取 token 失败，跳过注入：%s', e)
+        return
+
+    if not values:
+        logger.warning('巡检登录态注入：token payload 为空，跳过注入')
+        return
+
+    # 3. 把登录态写入当前 origin 的 localStorage
+    try:
+        for key, value in values.items():
+            page.evaluate("([k, v]) => localStorage.setItem(k, v)", [key, value])
+        logger.info('巡检登录态注入成功，域名：%s，key 数：%d', host, len(values))
+    except Exception as e:  # noqa: BLE001
+        logger.error('巡检登录态注入：写入 localStorage 失败：%s', e)
+
+
 def run_explore(user_description):
     """完整试运行：生成规范 → 翻译 → 执行 → 返回报告。
 
@@ -136,6 +188,8 @@ def run_explore(user_description):
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
             page = context.new_page()
+            # 注入巡检账号登录态到 localStorage，避免访问 SSO 站点被重定向到登录页
+            _inject_explore_login(page, nodes['precondition'])
             from .interpreter import execute_steps
             ok, first_error = execute_steps(page, steps, step_logger)
             browser.close()

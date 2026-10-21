@@ -55,14 +55,14 @@ class KolsysApi(KolEnum):
     def get_user_token(self,
                        user_email: str,
                        is_set_cache: bool = False,
-                       domain: str = "",
+                       domains=None,
                        ):
         """
         获取用户token
         :param user_email:      用户邮箱
         :param is_set_cache:    是否设置浏览器缓存   True-设置，False-不设置
-        :param domain:          要设置缓存的域名（须在 KolEnum.Domain 内）；
-                                为空时设置 Domain 枚举中的全部域名
+        :param domains:         要设置缓存的域名列表（每个须在 KolEnum.Domain 内），
+                                支持单个字符串或多个字符串列表；为空/None 时设置 Domain 枚举中的全部域名
         :return:
         """
         url = self.mi_url + "/api/iam/users/token"
@@ -90,7 +90,7 @@ class KolsysApi(KolEnum):
         print(f"claims:{info.claims}")
         print(f"user:{info.user}")
         if is_set_cache:
-            self._set_user_cache(user_email, data, domain=domain)
+            self._set_user_cache(user_email, data, domains=domains)
         return True, info
 
     def _build_mi_web_user_info(self, user: dict) -> dict:
@@ -115,24 +115,37 @@ class KolsysApi(KolEnum):
             },
         }
 
-    def _set_user_cache(self, user_email: str, data: dict, domain: str = ""):
+    def _set_user_cache(self, user_email: str, data: dict, domains=None):
         """把 token 接口返回的登录态注入浏览器 localStorage（is_set_cache=True 时调用）。
 
         :param user_email: 用户邮箱（仅用于日志）
         :param data:       token 接口返回的 data 字段
-        :param domain:     要设置的域名；为空时设置 Domain 枚举中的全部域名
+        :param domains:    要设置的域名列表；为空时设置 Domain 枚举中的全部域名
         """
         from base_utils.push_auth import set_auth
         user = data.get("user") or {}
-        # 目标域名列表：显式传入则只设置该域名（须在枚举内），否则设置全部枚举域名
-        domain = (domain or "").strip()
-        if domain:
-            if domain not in {d.value for d in self.Domain}:
-                logger.warning(f"忽略不在枚举内的域名：{domain}")
-                return
-            targets = [domain]
-        else:
+        # 归一化传入的域名列表：支持单个字符串或多个字符串列表；过滤空值并去重
+        if domains is None:
             targets = [d.value for d in self.Domain]
+        elif isinstance(domains, str):
+            targets = [domains]
+        else:
+            targets = list(domains)
+
+        valid_domain_values = {d.value for d in self.Domain}
+        targets = [t for t in targets if t and t in valid_domain_values]
+        # 去掉重复域名，同时保持顺序
+        seen = set()
+        uniq_targets = []
+        for t in targets:
+            if t not in seen:
+                seen.add(t)
+                uniq_targets.append(t)
+        targets = uniq_targets
+        # 未指定任何有效域名时，回退为全部枚举域名
+        if not targets:
+            targets = [d.value for d in self.Domain]
+
         try:
             for target in targets:
                 # Domain 枚举存的是完整 URL（https://...），push_auth 内部按 host 匹配标签页，
@@ -154,7 +167,7 @@ class KolsysApi(KolEnum):
                         "mi_web_user_token": json.dumps(self.default_token),
                     },
                 )
-            logger.info(f"【{user_email}】缓存设置成功！")
+            logger.info(f"【{user_email}】缓存设置成功！域名：{targets}")
         except Exception as e:
             logger.error(f"设置缓存异常，{e}")
 
@@ -194,31 +207,6 @@ class KolsysApi(KolEnum):
             "kolFullName": user.get("full_name"),
             "mi_web_user_Info": mi_web_user_info,
             "mi_web_user_token": json.dumps(self.default_token),
-        }
-
-    def get_user_token_payload(self, user_email: str) -> dict:
-        """获取用户 token 并返回 {domain, values}，供 Playwright 注入 localStorage（纯函数）。
-
-        不调用 push_auth、不操作本机浏览器；原有 get_user_token(is_set_cache=True) 逻辑不受影响。
-
-        返回:
-            dict — {"domain": "https://marketing-test.youxi123.com", "values": {7 个 key}}
-        """
-        url = self.mi_url + "/api/iam/users/token"
-        params = {"email": user_email}
-        logger.info(f"获取用户 token payload，email=【{user_email}】")
-        status, resp = my_get(url, headers=self.headers, params=params)
-        if not status:
-            raise RuntimeError(f"获取 token 请求失败：{resp}")
-        code_status = resp.get("status").get("code")
-        if code_status != 0:
-            raise RuntimeError(f"接口 code 错误，code_status:{code_status}")
-        data = resp.get("data")
-        self.default_token = data.get("token")
-        self._update_headers()
-        return {
-            "domain": "https://marketing-test.youxi123.com",
-            "values": self._build_auth_payload(data),
         }
 
     def create_order(self, res_id:str,media_source_list:list[str], price:int=100):
@@ -351,16 +339,17 @@ class KolsysApi(KolEnum):
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
-    # user_email = "xiaojiaqi@hungrystudio.com"    # 组员
-    # user_email='liuli@hungrystudio.com'   # 组员
+    user_email = "xiaojiaqi@hungrystudio.com"    # 组员
+    user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
-    user_email = "guosiyi@hungrystudio.com"  #审核员
+    # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
-    # user_email = "yekaiwulatai@hungrystudio.com"    #组长
+    # user_email = "yekaiwulatai@hungrystudio.com"    #组长   dbbida8dupss73b6bht0
     # user_email='licongze@hungrystudio.com'
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
-    kolsys_api.get_user_token(user_email, is_set_cache=True,domain=KolEnum.Domain.KOL_TEST)
+    kolsys_api.get_user_token(user_email, is_set_cache=True,
+                              domains=[KolEnum.Domain.KOL_TEST, KolEnum.Domain.KOL_DEV1])
     # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
