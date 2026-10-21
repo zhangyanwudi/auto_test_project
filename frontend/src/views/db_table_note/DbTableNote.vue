@@ -97,14 +97,24 @@
                     :key="row.name"
                     class="field-item"
                   >
-                    <div class="field-name" :title="row.name">{{ row.name }}</div>
-                    <el-input
-                      v-model="row.manual"
-                      type="textarea"
-                      :rows="3"
-                      :placeholder="row.comment ? '数据库注释：' + row.comment : '补充备注，支持多行（如枚举值逐条换行）'"
-                      @input="onFieldInput(t)"
-                    />
+                    <div class="field-head" @click="toggleFieldOpen(t, row)">
+                      <span class="field-name" :title="row.name">{{ row.name }}</span>
+                      <span class="field-comment" :title="row.comment">{{ row.comment || '无注释' }}</span>
+                      <el-icon class="field-arrow" :class="{ 'is-open': isFieldOpen(t, row) }">
+                        <ArrowRight v-if="!isFieldOpen(t, row)" />
+                        <ArrowDown v-else />
+                      </el-icon>
+                    </div>
+                    <div v-if="isFieldOpen(t, row)" class="field-edit">
+                      <el-input
+                        :model-value="row.manual || row.comment || ''"
+                        type="textarea"
+                        :autosize="{ minRows: 2, maxRows: 16 }"
+                        :class="{ 'is-db-comment': isDbComment(row) }"
+                        placeholder="填写字段备注，枚举值逐条换行"
+                        @update:model-value="(val) => onFieldManualInput(t, row, val)"
+                      />
+                    </div>
                   </div>
                   <el-empty
                     v-if="!isFieldsLoading(t) && !filteredFields(t).length"
@@ -303,6 +313,7 @@ import {
 
 const connections = ref([])
 const currentConnId = ref('')
+const prevConnId = ref('')   // 上一次的连接 id，用于切换连接时正确落库到旧连接
 const tables = ref([])
 const tableKeyword = ref('')
 const tableLoading = ref(false)
@@ -427,6 +438,7 @@ const fieldsMap = ref({})        // { table_name: [ {name, comment, manual} ] }
 const fieldsExpanded = ref({})   // { table_name: true }
 const fieldsLoadingMap = ref({}) // { table_name: true }
 const fieldKeywords = ref({})    // { table_name: 关键字 }
+const fieldOpenMap = ref({})     // { table_name: 当前展开编辑的字段名 }
 
 /* ---- 连接 ---- */
 const connDialogVisible = ref(false)
@@ -515,6 +527,7 @@ async function submitConn() {
       await loadConnections()
       if (!connEditingId.value && connForm.id) {
         currentConnId.value = connForm.id
+        prevConnId.value = connForm.id
         await loadTables()
       }
     } else {
@@ -553,6 +566,7 @@ async function onDeleteConn(conn) {
       ElMessage.success(res.message || '已删除')
       if (currentConnId.value === conn.id) {
         currentConnId.value = ''
+        prevConnId.value = ''
         tables.value = []
         currentTable.value = ''
       }
@@ -585,7 +599,9 @@ async function loadTables() {
 
 async function onConnChange() {
   // 切换连接前，先把当前表未保存的 SQL / 字段备注落库
-  await autoSaveCurrent()
+  // 注意：此时 currentConnId 已被 el-select 更新为新连接，需用切换前的 prevConnId 保存到旧连接
+  await autoSaveCurrent(prevConnId.value || currentConnId.value)
+  prevConnId.value = currentConnId.value
   currentTable.value = ''
   currentTableComment.value = ''
   noteForm.note = ''
@@ -594,6 +610,7 @@ async function onConnChange() {
   fieldsExpanded.value = {}
   fieldsLoadingMap.value = {}
   fieldKeywords.value = {}
+  fieldOpenMap.value = {}
   dirtyFields.value = {}
   savedSqlSnapshot.value = ''
   savedFieldNotesSnapshot.value = ''
@@ -648,6 +665,16 @@ function filteredFields(t) {
   })
 }
 
+function isFieldOpen(t, row) {
+  return fieldOpenMap.value[t.table_name] === row.name
+}
+
+/** 点击字段行：默认收起，点击展开该字段的备注编辑区（同表一次只展开一个） */
+function toggleFieldOpen(t, row) {
+  const open = isFieldOpen(t, row)
+  fieldOpenMap.value[t.table_name] = open ? '' : row.name
+}
+
 async function loadFieldsForTable(tableName) {
   if (!currentConnId.value || !tableName) return
   fieldsLoadingMap.value[tableName] = true
@@ -675,9 +702,15 @@ function buildFieldNotesFor(tableName) {
   return map
 }
 
-/** 字段手动输入时标记该表有未保存改动 */
-function onFieldInput(t) {
+/** 字段备注框输入：内容回写到 manual 并标记脏（框内初始展示 手动备注 || 数据库注释） */
+function onFieldManualInput(t, row, val) {
+  row.manual = val == null ? '' : val
   dirtyFields.value[t.table_name] = true
+}
+
+/** 是否正在显示数据库注释（无手动备注）→ 用于灰色区分 */
+function isDbComment(row) {
+  return !(row.manual || '').trim() && !!(row.comment || '').trim()
 }
 
 /**
@@ -685,8 +718,9 @@ function onFieldInput(t) {
  * - 右侧 SQL 输入框与快照不一致时保存 sql_records
  * - 字段有手动改动时保存 field_notes
  */
-async function autoSaveCurrent() {
-  if (!currentConnId.value || !currentTable.value) return
+async function autoSaveCurrent(connId) {
+  const cid = connId || currentConnId.value
+  if (!cid || !currentTable.value) return
   const sqlDirty = noteForm.sqlRecords !== savedSqlSnapshot.value
   const fieldDirty = !!dirtyFields.value[currentTable.value]
 
@@ -694,7 +728,7 @@ async function autoSaveCurrent() {
 
   noteSaving.value = true
   try {
-    const payload = { connection_id: currentConnId.value, table_name: currentTable.value }
+    const payload = { connection_id: cid, table_name: currentTable.value }
     if (sqlDirty) payload.sql_records = noteForm.sqlRecords
     if (fieldDirty) payload.field_notes = buildFieldNotesFor(currentTable.value)
 
@@ -1063,6 +1097,7 @@ onMounted(async () => {
   await loadConnections()
   if (connections.value.length) {
     currentConnId.value = connections.value[0].id
+    prevConnId.value = currentConnId.value
     await loadTables()
   }
 })
@@ -1240,25 +1275,75 @@ onMounted(async () => {
 }
 
 .field-item {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  background: var(--el-fill-color-blank);
 }
 
 .field-item:last-child {
   margin-bottom: 0;
 }
 
+.field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.field-head:hover {
+  background: var(--el-color-primary-light-9);
+}
+
 .field-name {
-  margin-bottom: 4px;
+  flex-shrink: 0;
+  max-width: 130px;
   font-family: 'SF Mono', 'JetBrains Mono', Consolas, Menlo, monospace;
   font-size: 12px;
   font-weight: 600;
   color: var(--el-text-color-primary);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.field-item :deep(.el-textarea__inner) {
+.field-comment {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-arrow {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  transition: transform 0.15s, color 0.15s;
+}
+
+.field-arrow.is-open {
+  color: var(--el-color-primary);
+}
+
+.field-edit {
+  padding: 6px 8px 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+
+.field-edit :deep(.el-textarea__inner) {
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* 显示数据库注释时置灰，与字段名右侧的注释颜色一致；手动注释保持默认色 */
+.field-edit .is-db-comment :deep(.el-textarea__inner) {
+  color: var(--el-text-color-secondary);
 }
 
 .right-panel {
