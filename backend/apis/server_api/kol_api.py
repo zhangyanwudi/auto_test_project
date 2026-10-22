@@ -341,13 +341,14 @@ if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"    # 组员
     user_email='liuli@hungrystudio.com'   # 组员
-    user_email = "zhangyan02195@hungrystudio.com"  # 管理员
+    # user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长   dbbida8dupss73b6bht0
     # user_email='licongze@hungrystudio.com'
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
+    # user_email='zhangchunlan@hungrystudio.com'  # 春兰
     kolsys_api.get_user_token(user_email, is_set_cache=True,
                               domains=[KolEnum.Domain.KOL_TEST, KolEnum.Domain.KOL_DEV1])
     # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")

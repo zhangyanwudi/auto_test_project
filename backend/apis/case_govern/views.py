@@ -38,8 +38,8 @@ def _fmt_dt(dt):
 
 
 SHARE_SALT = 'case_govern.share'
-# 分享链接有效期（秒），0 表示永久有效
-SHARE_MAX_AGE = 7 * 24 * 3600
+# 分享链接有效期：None 表示永久有效，不校验过期时间
+SHARE_MAX_AGE = None
 
 
 def make_share_token(case_id):

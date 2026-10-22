@@ -871,8 +871,15 @@ const highlightedSql = computed(() => buildHighlightedSql())
  * 在粘贴 / 失焦时自动调用，不弹窗确认。
  */
 function formatSqlText() {
+  const ta = sqlTextareaRef.value
   const raw = noteForm.sqlRecords || ''
   if (!raw.trim()) return
+
+  // 保存当前选区：格式化会重新赋值导致选区丢失，需在格式化后原样恢复
+  const selStart = ta ? ta.selectionStart : null
+  const selEnd = ta ? ta.selectionEnd : null
+  // 保存滚动位置：重新赋值 value 时 textarea 滚动会归零，需同步恢复
+  const scrollTop = ta ? ta.scrollTop : 0
 
   // 归一化弯引号，保证字符串引号匹配
   const normalized = raw.replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
@@ -944,6 +951,17 @@ function formatSqlText() {
   // 结果与当前值相同时不赋值，避免无意义重渲染导致光标/选区丢失
   if (result !== raw) {
     noteForm.sqlRecords = result
+    // 恢复选区（文本长度不变，仅关键字大小写/引号变化，偏移量仍有效）与滚动位置
+    if (ta && selStart != null) {
+      nextTick(() => {
+        ta.scrollTop = scrollTop
+        ta.setSelectionRange(selStart, selEnd)
+        // 同步高亮层的滚动位置，避免两层文字错位
+        if (sqlHighlightRef.value) {
+          sqlHighlightRef.value.scrollTop = scrollTop
+        }
+      })
+    }
   }
 }
 
