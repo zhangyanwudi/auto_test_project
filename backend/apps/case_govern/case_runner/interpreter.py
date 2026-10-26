@@ -12,10 +12,22 @@ class StepExecutionError(Exception):
 
 
 def _wait_ms_spec(step):
-    """从 wait 步骤里解析等待时长（毫秒）；支持 wait(selector) 或 wait(N秒)。"""
-    # 若有 selector 则等待元素
-    if step.get('selector'):
-        return None  # None 表示等待元素
+    """从 wait 步骤里解析等待时长（毫秒）；支持 wait(selector) 或 wait(N秒)。
+
+    selector 可能是「等待元素出现」的 css/text，也可能是 AI 误把纯数字/N秒
+    放进了 selector 字段（如 {"selector": 2000}），这里统一按值判断：
+    纯数字或含「秒」的视为固定时长，其余才当作元素选择器返回 None。
+    """
+    sel = step.get('selector')
+    if sel is not None:
+        s = str(sel).strip()
+        # 纯数字或含「秒/s」的写法 → 固定时长
+        if re.fullmatch(r'\d+', s) or re.search(r'秒|[a-z]s?\b', s):
+            if re.fullmatch(r'\d+', s):
+                return int(s)
+            m = re.search(r'(\d+)\s*(?:秒|s)?', s)
+            return int(m.group(1)) * 1000 if m else 3000
+        return None  # 否则视为等待元素
     # 尝试从 text/ms 里解析
     for key in ('ms', 'text'):
         v = step.get(key)
@@ -110,18 +122,47 @@ def _looks_like_text(sel):
     return not re.search(r'[#\.\[\]=>:\*]', sel) and not sel.startswith('//')
 
 
+def _locate_form_input(page, sel, timeout=10000):
+    """按表单字段 label 定位输入控件（适配 Arco/Element/Ant 等表单项结构）。
+
+    巡检里用户用「筛选框条件（如 达人昵称）」描述要填的输入框，但这类
+    筛选框 placeholder 多为「请输入」等通用文案、不唯一，直接用 placeholder
+    定位会误伤其它输入框。这里把字段名当作 label 文本，在表单项内找到
+    对应的 input/textarea 返回；找不到时返回 None，由调用方回退到 css 定位。
+    """
+    if not _looks_like_text(sel):
+        return None
+    name = sel[5:] if sel.startswith('text=') else sel
+    if not name:
+        return None
+    item = page.locator(
+        '.arco-form-item, .el-form-item, .ant-form-item, [class*="form-item"]'
+    ).filter(has=page.get_by_text(name, exact=True))
+    # 等表单项异步渲染出现（goto 后立即 type 时，筛选栏可能尚未挂载）
+    try:
+        item.first.wait_for(state='attached', timeout=timeout)
+    except Exception:
+        return None
+    control = item.first.locator('input, textarea')
+    return control if control.count() else None
+
+
 def _type(page, selector, text):
     sel = _resolve_selector(selector)
+    # 优先按字段 label 定位输入框（筛选框 placeholder 常为「请输入」，不唯一）
+    loc = _locate_form_input(page, sel)
+    if loc is not None:
+        loc.fill(str(text), timeout=10000)
+        return
     page.locator(sel).fill(str(text), timeout=10000)
 
 
 def _wait(page, step):
-    sel = step.get('selector')
-    if sel:
-        page.locator(sel).wait_for(state='visible', timeout=10000)
-    else:
-        ms = _wait_ms_spec(step)
+    ms = _wait_ms_spec(step)
+    if ms is not None:
         page.wait_for_timeout(ms)
+    else:
+        page.locator(step.get('selector')).wait_for(state='visible', timeout=10000)
 
 
 def _assert(page, step):
@@ -148,7 +189,10 @@ def _assert(page, step):
         if not loc.first.is_enabled():
             raise StepExecutionError(f'元素不可点击：{sel}')
     elif mode == 'exists':
-        if not page.locator(sel).count():
+        # 若给的是字段名（如 达人昵称），先尝试按 label 找到对应输入框/表单项，再按元素存在断言
+        loc = _locate_form_input(page, sel) if _looks_like_text(sel) else None
+        target = loc if loc is not None else page.locator(sel)
+        if not target.count():
             raise StepExecutionError(f'元素不存在：{sel}')
     else:
         raise StepExecutionError(f'未知断言 mode：{mode}')

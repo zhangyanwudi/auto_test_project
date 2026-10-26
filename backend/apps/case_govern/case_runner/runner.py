@@ -97,11 +97,13 @@ def _merge_steps_with_nodes(steps, nodes):
     return steps
 
 
-def _inject_explore_login(page, target_url):
+def _inject_explore_login(context, target_url):
     """给巡检页面注入登录态（localStorage），避免访问 SSO 站点被重定向到登录页。
 
-    先打开目标域名建立一个同源页面（否则无法写 localStorage），再拉取巡检账号
-    的 token，把 7 个登录态 key 写进 localStorage，最后重新跳转到目标页面。
+    通过 context.add_init_script 在「每个文档创建、页面脚本运行前」注入，这样即使
+    首次访问被 SSO 重定向，最终回到目标域时登录态也已在 localStorage 中就绪，
+    前端路由守卫能直接读到 token 而不再二次跳转（旧实现先 goto 再 evaluate 写入，
+    会与重定向竞态，导致写到 SSO 域、注入失败）。
     """
     from urllib.parse import urlparse
     from base_utils.logger_base import logger
@@ -109,16 +111,11 @@ def _inject_explore_login(page, target_url):
     host = (urlparse(target_url).netloc or '').strip()
     if not host:
         logger.warning('巡检登录态注入跳过：无法从 URL 解析域名 %s', target_url)
-        return
+        return False
 
-    # 1. 先打开目标域名（任意路径），让浏览器建立该 origin 的页面
-    origin = f"https://{host}/"
-    try:
-        page.goto(origin, wait_until='domcontentloaded', timeout=30000)
-    except Exception as e:  # noqa: BLE001
-        logger.warning('巡检登录态注入：打开 %s 失败（继续尝试注入）：%s', origin, e)
+    origin = f"https://{host}"
 
-    # 2. 每次巡检都调用 get_user_token 拉取最新 token（该方法内部会用真实邮箱请求
+    # 1. 每次巡检都调用 get_user_token 拉取最新 token（该方法内部会用真实邮箱请求
     #    iam 接口，拿到当前有效的 token 与用户信息），再组装成登录态注入 localStorage
     try:
         from apis.server_api.kol_api import KolsysApi
@@ -126,23 +123,35 @@ def _inject_explore_login(page, target_url):
         ok, info = api.get_user_token(EXPLORE_ACCOUNT_EMAIL, is_set_cache=False)
         if not ok:
             logger.error('巡检登录态注入：获取 token 失败，跳过注入：%s', info)
-            return
+            return False
         values = api._build_auth_payload({'user': info.user})
     except Exception as e:  # noqa: BLE001
         logger.error('巡检登录态注入：获取 token 失败，跳过注入：%s', e)
-        return
+        return False
 
     if not values:
         logger.warning('巡检登录态注入：token payload 为空，跳过注入')
-        return
+        return False
 
-    # 3. 把登录态写入当前 origin 的 localStorage
+    # 2. 序列化 payload（dict 值存成 JSON 字符串，与前端 JSON.parse 读取一致）
+    serialized = {}
+    for key, value in values.items():
+        serialized[key] = json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else value
+
+    # 3. 注册 init script：仅当页面落在目标 origin 时才写入，避免污染 SSO 等其它域
+    init_js = (
+        "if (location.origin === %s) {"
+        "  const d = %s;"
+        "  for (const [k, v] of Object.entries(d)) { localStorage.setItem(k, v); }"
+        "}"
+    ) % (json.dumps(origin), json.dumps(serialized, ensure_ascii=False))
     try:
-        for key, value in values.items():
-            page.evaluate("([k, v]) => localStorage.setItem(k, v)", [key, value])
-        logger.info('巡检登录态注入成功，域名：%s，key 数：%d', host, len(values))
+        context.add_init_script(init_js)
+        logger.info('巡检登录态注入已注册，域名：%s，key 数：%d', host, len(serialized))
+        return True
     except Exception as e:  # noqa: BLE001
-        logger.error('巡检登录态注入：写入 localStorage 失败：%s', e)
+        logger.error('巡检登录态注入：注册 init script 失败：%s', e)
+        return False
 
 
 def run_explore(user_description):
@@ -187,9 +196,9 @@ def run_explore(user_description):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
-            page = context.new_page()
             # 注入巡检账号登录态到 localStorage，避免访问 SSO 站点被重定向到登录页
-            _inject_explore_login(page, nodes['precondition'])
+            _inject_explore_login(context, nodes['precondition'])
+            page = context.new_page()
             from .interpreter import execute_steps
             ok, first_error = execute_steps(page, steps, step_logger)
             browser.close()

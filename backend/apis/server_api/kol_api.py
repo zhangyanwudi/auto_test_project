@@ -336,12 +336,16 @@ class KolsysApi(KolEnum):
         return status, users_info
 
 
+    def query_kolsys_daren_list_data(self):
+        """查询达人管理列表数据"""
+
+
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"    # 组员
-    user_email='liuli@hungrystudio.com'   # 组员
-    # user_email = "zhangyan02195@hungrystudio.com"  # 管理员
+    # user_email='liuli@hungrystudio.com'   # 组员
+    user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长   dbbida8dupss73b6bht0

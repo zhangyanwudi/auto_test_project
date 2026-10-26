@@ -91,9 +91,13 @@ def build_translate_prompt():
 ## selector 规则
 
 - 有 id 用 id；有 name 用 name；按钮/链接用文字 text=xxx；否则用 css 描述
+- **输入框（type 动作）**：用户描述的是「筛选条件字段名」（如「达人昵称」「对方主体」），
+  这类输入框的 placeholder 常是「请输入」等通用文案、不唯一，**不要用 placeholder 定位**，
+  直接把字段名原文作为 selector（如 `达人昵称`），执行器会按表单项 label 关联到对应输入框
 - 断言「页面 包含 X」→ selector 用 body，mode=contains，text=X
 - 断言「列表 有数据」→ selector 用列表容器（如 table、.list 或 [class*=list]），mode=has_data
-- 断言「元素 X 存在」→ selector 用元素的 css/id（如 #kw、input[type=text]），mode=exists
+- 断言「元素 X 存在」→ selector 用元素的 css/id（如 #kw、input[type=text]），mode=exists；
+  若 X 是字段名（如「达人昵称」），直接用字段名原文即可
 
 ## 输出格式（严格）
 

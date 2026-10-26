@@ -547,7 +547,7 @@ async function onShare(row) {
     const url = `${window.location.origin}/case_share/${res.data.token}`
     try {
       await copyText(url)
-      ElMessage.success('分享链接已复制到剪贴板（7 天内有效）')
+      ElMessage.success('分享链接已复制到剪贴板')
     } catch {
       ElMessage.error(`复制失败，请手动复制：${url}`)
     }
