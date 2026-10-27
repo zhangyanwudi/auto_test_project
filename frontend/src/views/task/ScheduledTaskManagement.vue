@@ -250,6 +250,14 @@
         <p class="run-result-section-title">运行环境</p>
         <pre class="run-result-pre">{{ runResultView.metaText }}</pre>
       </template>
+      <template v-if="runResultView.successMsgs.length">
+        <p class="run-result-section-title">成功消息</p>
+        <pre class="run-result-pre">{{ runResultView.successMsgs.join('\n') }}</pre>
+      </template>
+      <template v-if="runResultView.failMsgs.length">
+        <p class="run-result-section-title">失败消息</p>
+        <pre class="run-result-pre run-result-pre-err">{{ runResultView.failMsgs.join('\n') }}</pre>
+      </template>
       <template v-if="runResultView.stdout">
         <p class="run-result-section-title">标准输出</p>
         <pre class="run-result-pre">{{ runResultView.stdout }}</pre>
@@ -307,6 +315,8 @@ const runResultView = reactive({
   taskName: '',
   message: '',
   metaText: '',
+  successMsgs: [],
+  failMsgs: [],
   stdout: '',
   stderr: '',
 })
@@ -633,6 +643,17 @@ function runNowRowDisabled(row) {
   return false
 }
 
+function _asMsgList(value) {
+  if (Array.isArray(value)) {
+    return value.map((x) => String(x).trim()).filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    const s = value.trim()
+    return s ? [s] : []
+  }
+  return []
+}
+
 function fillRunResultView(row, runResult) {
   const rr = runResult || {
     success: row.last_run_success,
@@ -652,6 +673,8 @@ function fillRunResultView(row, runResult) {
     d.returncode != null && `退出码：${d.returncode}`,
   ].filter(Boolean)
   runResultView.metaText = meta.join('\n')
+  runResultView.successMsgs = _asMsgList(d.success_msgs)
+  runResultView.failMsgs = _asMsgList(d.fail_msgs)
   runResultView.stdout = String(d.stdout || '').trim()
   runResultView.stderr = String(d.stderr || '').trim()
 }

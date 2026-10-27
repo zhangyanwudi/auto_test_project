@@ -25,7 +25,7 @@ import io
 from contextlib import redirect_stdout
 
 from apis.server_api.kol_api import KolsysApi
-from base_utils.task_result_base import emit_task_result
+from base_utils.task_result_base import TaskResultBuilder
 
 # 巡检账号（管理员）；is_debug=True 走测试环境，False 走正式环境
 KOL_USER_EMAIL = "zhangyan02195@hungrystudio.com"
@@ -87,20 +87,22 @@ def _send_robot_message(message):
 def run_kol_activate_pro():
     """执行 KOL 接口巡检，输出完整日志 + 机器人消息，并上报整体结果。"""
     api = KolsysApi(is_debug=IS_DEBUG)
+    result = TaskResultBuilder()
 
     # 前置：刷新巡检账号 token（失败不终止，后续接口会用默认 token 尝试）。
     # get_user_token 内部有裸 print 会打印 token 等敏感信息，这里用 redirect_stdout 吞掉。
     with redirect_stdout(io.StringIO()):
         ok, info = api.get_user_token(KOL_USER_EMAIL, is_set_cache=False)
     if not ok:
+        result.add_fail(f"刷新 token 失败（将以默认 token 继续）：{info}")
         print(f"[巡检] 刷新 token 失败（将以默认 token 继续）：{info}")
     else:
+        result.add_success("刷新 token 成功")
         print("[巡检] 刷新 token 成功")
 
     passed = 0
     failed = 0
     total = len(CASES)
-    fail_msgs = []
     robot_lines = []  # 机器人消息里每个接口的一行（精简版）
 
     # ── 完整日志（详细）──
@@ -113,15 +115,19 @@ def run_kol_activate_pro():
             ok, detail = case["check"](status, data)
         except Exception as e:  # noqa: BLE001 巡检兜底，单个接口异常不影响汇总
             ok, detail = False, f"执行异常：{e}"
+        # 运行消息统一收集到 result（最终体现在页面「成功消息/失败消息」），
+        # 同时作为机器人消息的精简版一行。
         if ok:
             passed += 1
-            print(f"  检查结果：✅ 通过（{detail}）")
-            robot_lines.append(f"[{i}/{total}] 接口名称：{name}  检查结果：✅ 通过（{detail}）")
+            line = f"[{i}/{total}] {name}：✅ 通过（{detail}）"
+            result.add_success(line)
+            robot_lines.append(line)
         else:
             failed += 1
-            fail_msgs.append(f"{name}：{detail}")
-            print(f"  检查结果：❌ 失败（{detail}）")
-            robot_lines.append(f"[{i}/{total}] 接口名称：{name}  检查结果：❌ 失败（{detail}）")
+            line = f"[{i}/{total}] {name}：❌ 失败（{detail}）"
+            result.add_fail(line)
+            robot_lines.append(line)
+        print(f"  检查结果：{'✅ 通过' if ok else '❌ 失败'}（{detail}）")
     print("=" * 44)
     print(f"巡检汇总：通过 {passed} / 失败 {failed} / 共 {total}")
 
@@ -133,9 +139,9 @@ def run_kol_activate_pro():
     #    不是机器人消息，不会通过机器人发送 ──
     print("[任务结果上报] 下方 JSON 供调度系统解析，非机器人消息：")
     if failed:
-        emit_task_result(False, "；".join(fail_msgs))
+        result.emit(False, f"KOL 接口巡检：通过 {passed} / 失败 {failed} / 共 {total}")
     else:
-        emit_task_result(True, f"KOL 接口巡检通过 {passed}/{total}")
+        result.emit(True, f"KOL 接口巡检通过 {passed}/{total}")
 
 
 if __name__ == "__main__":

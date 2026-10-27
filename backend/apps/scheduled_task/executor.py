@@ -74,6 +74,26 @@ CRON_5 = re.compile(r'^\S+\s+\S+\s+\S+\s+\S+\s+\S+$')
 _TASK_RESULT_PREFIX = '@TASK_RESULT@'
 
 
+def _coerce_msg_list(raw):
+    """把 success_msgs / fail_msgs 规整为字符串列表（过滤空值、截断单条长度）。"""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        s = raw.strip()
+        return [s[:_MAX_CAPTURE]] if s else []
+    if isinstance(raw, (list, tuple)):
+        out = []
+        for item in raw:
+            if item is None:
+                continue
+            s = str(item).strip()
+            if s:
+                out.append(s[:_MAX_CAPTURE])
+        return out
+    s = str(raw).strip()
+    return [s[:_MAX_CAPTURE]] if s else []
+
+
 def _coerce_success_value(raw):
     if isinstance(raw, bool):
         return raw
@@ -118,7 +138,22 @@ def _try_parse_result_line(line: str):
         msg = '任务返回失败但未提供 message 失败原因'
     elif ok and not msg:
         msg = '执行成功'
-    return {'success': ok, 'message': msg}
+
+    success_msgs = _coerce_msg_list(obj.get('success_msgs'))
+    fail_msgs = _coerce_msg_list(obj.get('fail_msgs'))
+    # 兜底：未显式提供 message 时，用失败/成功消息拼接，便于列表直接展示结果。
+    if not msg:
+        if fail_msgs:
+            msg = '；'.join(fail_msgs)
+        elif success_msgs:
+            msg = '；'.join(success_msgs)
+
+    return {
+        'success': ok,
+        'message': msg,
+        'success_msgs': success_msgs,
+        'fail_msgs': fail_msgs,
+    }
 
 
 def parse_task_script_result(stdout: str):
@@ -286,18 +321,19 @@ def execute_task_once(task, task_file_name_override=None):
     except Exception as e:
         logger.exception('scheduled_task run failed: %s', e)
         return False, f'执行过程异常：{e}', detail_base
-    detail = {
-        **detail_base,
-        'returncode': proc.returncode,
-        'stdout': _truncate_out(proc.stdout or ''),
-        'stderr': _truncate_out(proc.stderr or ''),
-    }
+    detail = {**detail_base, 'returncode': proc.returncode}
     parsed, parse_err = parse_task_script_result(proc.stdout)
     if parsed is not None:
         ok = parsed['success']
         msg = parsed['message']
         detail['task_result'] = parsed
+        # 有合法结果 JSON 时，用任务回传的成功/失败消息展示，不再兜底输出 stdout/stderr
+        detail['success_msgs'] = parsed.get('success_msgs') or []
+        detail['fail_msgs'] = parsed.get('fail_msgs') or []
         return ok, msg, detail
+    # 未解析到合法结果 JSON：保留 stdout/stderr 供排查
+    detail['stdout'] = _truncate_out(proc.stdout or '')
+    detail['stderr'] = _truncate_out(proc.stderr or '')
     if proc.returncode != 0:
         return False, f'脚本退出码 {proc.returncode}，且未返回任务结果 JSON', detail
     return False, parse_err or TASK_RESULT_FORMAT_HINT, detail
