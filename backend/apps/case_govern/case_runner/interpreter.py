@@ -5,6 +5,7 @@
 每个 step 执行前后通过 StepLogger 记录日志（步骤序号/节点/类型/目标/结果/耗时）。
 """
 import re
+import time
 
 
 class StepExecutionError(Exception):
@@ -108,13 +109,13 @@ def _resolve_selector(selector):
 
 def _click(page, selector):
     sel = _resolve_selector(selector)
-    # 优先用 text= 按钮文字定位，其次直接 css
-    locator = page.get_by_text(sel, exact=False).first if _looks_like_text(sel) else page.locator(sel)
+    # 优先用 text= 按钮文字定位，其次直接 css；文本命中多个时取第一个（避免 strict mode 冲突）
+    locator = page.get_by_text(sel, exact=False).first if _looks_like_text(sel) else page.locator(sel).first
     try:
         locator.click(timeout=10000)
     except Exception:
         # 兜底：尝试 css 定位
-        page.locator(sel).click(timeout=10000)
+        page.locator(sel).first.click(timeout=10000)
 
 
 def _looks_like_text(sel):
@@ -129,21 +130,43 @@ def _locate_form_input(page, sel, timeout=10000):
     筛选框 placeholder 多为「请输入」等通用文案、不唯一，直接用 placeholder
     定位会误伤其它输入框。这里把字段名当作 label 文本，在表单项内找到
     对应的 input/textarea 返回；找不到时返回 None，由调用方回退到 css 定位。
+
+    兼容「达人昵称输入框」这类带后缀的写法：先剥掉「输入框/筛选框」等后缀，
+    再精确匹配 label，失败时回退到包含匹配。
     """
     if not _looks_like_text(sel):
         return None
     name = sel[5:] if sel.startswith('text=') else sel
     if not name:
         return None
+    # 剥掉「输入框/筛选框/选择框/查询框/下拉框」等后缀，得到纯字段名
+    name = re.sub(r'(输入框|筛选框|选择框|查询框|下拉框|搜索框|输入)$', '', name)
+    if not name:
+        return None
+
     item = page.locator(
         '.arco-form-item, .el-form-item, .ant-form-item, [class*="form-item"]'
-    ).filter(has=page.get_by_text(name, exact=True))
+    )
     # 等表单项异步渲染出现（goto 后立即 type 时，筛选栏可能尚未挂载）
     try:
         item.first.wait_for(state='attached', timeout=timeout)
     except Exception:
         return None
-    control = item.first.locator('input, textarea')
+    # 先精确匹配 label，再回退到包含匹配
+    matched = item.filter(has=page.get_by_text(name, exact=True))
+    if not matched.count():
+        matched = item.filter(has=page.get_by_text(name, exact=False))
+    if not matched.count():
+        return None
+    # 若多处同名（如筛选栏 + 上传弹窗），优先选 placeholder 为「请输入」这类
+    # 筛选栏通用文案的输入框（符合「筛选条件」语义）
+    preferred = matched.locator(
+        'input[placeholder="请输入"], input[placeholder*="请输入"], '
+        'textarea[placeholder="请输入"], textarea[placeholder*="请输入"]'
+    )
+    if preferred.count():
+        return preferred.first
+    control = matched.locator('input, textarea')
     return control if control.count() else None
 
 
@@ -161,8 +184,14 @@ def _wait(page, step):
     ms = _wait_ms_spec(step)
     if ms is not None:
         page.wait_for_timeout(ms)
-    else:
-        page.locator(step.get('selector')).wait_for(state='visible', timeout=10000)
+        return
+    sel = step.get('selector')
+    # 字段名（如「达人昵称输入框」）→ 优先按 label 定位到输入框后等待可见
+    loc = _locate_form_input(page, sel) if _looks_like_text(sel) else None
+    if loc is not None:
+        loc.wait_for(state='visible', timeout=10000)
+        return
+    page.locator(sel).wait_for(state='visible', timeout=10000)
 
 
 def _assert(page, step):
@@ -170,16 +199,40 @@ def _assert(page, step):
     sel = step.get('selector')
     text = step.get('text', '')
     if mode == 'contains':
-        # 断言页面/容器文本包含指定文字
-        body_text = page.locator(sel).inner_text() if sel and sel != 'body' else page.inner_text('body')
+        # 断言页面/容器文本包含指定文字。查询后的结果常是异步渲染，
+        # 这里做短暂轮询等待（最多 5s），避免「点击查询后立即断言」时数据尚未返回
+        locator = page.locator(sel) if sel and sel != 'body' else None
+        deadline = time.time() + 5
+        body_text = ''
+        while time.time() < deadline:
+            body_text = locator.inner_text() if locator is not None else page.inner_text('body')
+            if text and text in body_text:
+                break
+            page.wait_for_timeout(500)
         if text and text not in body_text:
             raise StepExecutionError(f'未找到文本「{text}」')
     elif mode == 'has_data':
-        # 断言列表/表格有数据（行数 > 0）
-        count = page.locator(f'{sel} tr, {sel} [class*=item], {sel} [class*=row], {sel} tbody tr').count()
+        # 断言列表/表格有数据（行数 > 0）。兼容 table 行、卡片列表（arco-list-item）、
+        # 通用 list/item/row 容器等多类结构，避免达人管理页这种非 table 列表被误判为空
+        base = sel or 'body'
+        candidates = (
+            f'{base} tr',
+            f'{base} tbody tr',
+            f'{base} [class*=list-item]',
+            f'{base} [class*=item]',
+            f'{base} [class*=row]',
+            f'{base} .arco-list-item',
+            f'{base} .arco-card',
+        )
+        count = 0
+        for c in candidates:
+            n = page.locator(c).count()
+            if n > 0:
+                count = n
+                break
         if count == 0:
             # 兜底：直接数容器下第一层子元素
-            count = page.locator(sel).locator('*').count()
+            count = page.locator(base).locator(':scope > *').count()
         if count == 0:
             raise StepExecutionError('列表未加载出数据')
     elif mode == 'clickable':

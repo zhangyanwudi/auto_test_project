@@ -158,9 +158,44 @@ def module_list(request):
 @require_http_methods(['GET'])
 @require_valid_token
 def case_list(request):
-    """用例列表（按 id 倒序），附带节点数统计。"""
+    """用例列表（按 id 倒序），附带节点数统计。
+
+    支持分页：传 page/page_size 时返回 {"list": [...], "total": n}；
+    不传时保持向后兼容，返回数组（供导出页按整表查找单个用例）。
+    支持 keyword 过滤（用例名称/模块/创建人/说明模糊匹配）。
+    """
+    from django.db.models import Q
     qs = ZCaseGovernCase.objects.annotate(node_count=Count('nodes')).order_by('-id')
-    return JsonResponse({'code': 0, 'data': [_serialize_case(c, c.node_count) for c in qs]})
+
+    keyword = (request.GET.get('keyword') or '').strip()
+    if keyword:
+        qs = qs.filter(
+            Q(case_name__icontains=keyword)
+            | Q(module__icontains=keyword)
+            | Q(creator__icontains=keyword)
+            | Q(description__icontains=keyword)
+        )
+
+    page_raw = (request.GET.get('page') or '').strip()
+    size_raw = (request.GET.get('page_size') or '').strip()
+    if not page_raw and not size_raw:
+        return JsonResponse({'code': 0, 'data': [_serialize_case(c, c.node_count) for c in qs]})
+
+    try:
+        page = int(page_raw) if page_raw else 1
+        page_size = int(size_raw) if size_raw else 10
+    except ValueError:
+        return JsonResponse({'code': 400, 'message': 'page / page_size 须为整数'}, status=400)
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+
+    total = qs.count()
+    offset = (page - 1) * page_size
+    items = qs[offset:offset + page_size]
+    return JsonResponse({'code': 0, 'data': {
+        'list': [_serialize_case(c, c.node_count) for c in items],
+        'total': total,
+    }})
 
 
 @csrf_exempt

@@ -8,9 +8,14 @@ export async function fetchModuleList() {
   return res.json()
 }
 
-/** 用例列表（含节点数） */
-export async function fetchCaseList() {
-  const res = await requestWithToken(`${BASE}/cases/`)
+/** 用例列表（含节点数）。传 page/page_size 时分页，返回 { list, total }；不传时返回数组。 */
+export async function fetchCaseList(params = {}) {
+  const qs = new URLSearchParams()
+  if (params.page) qs.set('page', String(params.page))
+  if (params.page_size) qs.set('page_size', String(params.page_size))
+  if (params.keyword) qs.set('keyword', String(params.keyword))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const res = await requestWithToken(`${BASE}/cases/${suffix}`)
   return res.json()
 }
 

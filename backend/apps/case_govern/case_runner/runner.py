@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-巡检试运行编排：AI 生成规范 → Playwright 无痕执行 → 每步日志 → 报告。
+巡检试运行编排：AI 自主探索 → 反推规范 → 报告。
 
-执行前会拉取巡检账号（默认 zhangyan02195@***.com）的登录态注入 localStorage，
-避免访问需要 SSO 登录的页面（如 marketing-test.youxi123.com）时被重定向到登录页。
+流程（agentic 探索，而不是盲写规范）：
+  1. 从用户描述提取起始 URL；
+  2. 注入巡检账号登录态（默认 zhangyan02195@***.com），避免访问 SSO 站点被重定向到登录页；
+  3. explorer.run_explore_loop 自主探索：AI 观察页面 → 决策 → 执行 → 失败回喂重试；
+  4. 探索成功后用真实动作序列反推「节点规范草稿」，失败则返回卡点 + 日志路径。
 """
 import json
 import re
 
-from .prompts import build_explore_system_prompt, build_translate_prompt
-from .schema import parse_steps_json, validate_step
+from .prompts import build_explore_system_prompt
 from .step_logger import StepLogger
 
 # 巡检执行器注入登录态用的默认账号（拉取 token 时传的邮箱，须为完整真实邮箱）
@@ -23,13 +25,26 @@ def _call_ai(messages):
 
 
 def generate_spec(user_description):
-    """阶段一：根据用户描述生成「节点规范草稿」文本。"""
+    """阶段一：根据用户描述生成「节点规范草稿」文本。
+
+    注意：run_explore 已改为「探索成功后再反推规范」，不再依赖盲写的 generate_spec；
+    此函数保留供需要时直接生成草稿预览使用。
+    """
     messages = [
         {'role': 'system', 'content': build_explore_system_prompt()},
         {'role': 'user', 'content': user_description},
     ]
     reply = _call_ai(messages)
     return reply
+
+
+def _extract_start_url(user_description):
+    """从用户描述里提取起始 URL（第一个 http 开头的 token）。"""
+    m = re.search(r'https?://\S+', user_description or '')
+    if not m:
+        return None
+    return m.group(0).rstrip('，。；;、,>）)')
+
 
 
 def _parse_spec_to_nodes(spec_text):
@@ -110,7 +125,7 @@ def _inject_explore_login(context, target_url):
 
     host = (urlparse(target_url).netloc or '').strip()
     if not host:
-        logger.warning('巡检登录态注入跳过：无法从 URL 解析域名 %s', target_url)
+        logger.warning('巡检登录态注入跳过：无法从 URL 解析域名 {}', target_url)
         return False
 
     origin = f"https://{host}"
@@ -122,11 +137,11 @@ def _inject_explore_login(context, target_url):
         api = KolsysApi(is_debug=True)
         ok, info = api.get_user_token(EXPLORE_ACCOUNT_EMAIL, is_set_cache=False)
         if not ok:
-            logger.error('巡检登录态注入：获取 token 失败，跳过注入：%s', info)
+            logger.error('巡检登录态注入：获取 token 失败，跳过注入：{}', info)
             return False
         values = api._build_auth_payload({'user': info.user})
     except Exception as e:  # noqa: BLE001
-        logger.error('巡检登录态注入：获取 token 失败，跳过注入：%s', e)
+        logger.error('巡检登录态注入：获取 token 失败，跳过注入：{}', e)
         return False
 
     if not values:
@@ -147,71 +162,117 @@ def _inject_explore_login(context, target_url):
     ) % (json.dumps(origin), json.dumps(serialized, ensure_ascii=False))
     try:
         context.add_init_script(init_js)
-        logger.info('巡检登录态注入已注册，域名：%s，key 数：%d', host, len(serialized))
+        logger.info('巡检登录态注入已注册，域名：{}，key 数：{}', host, len(serialized))
         return True
     except Exception as e:  # noqa: BLE001
-        logger.error('巡检登录态注入：注册 init script 失败：%s', e)
+        logger.error('巡检登录态注入：注册 init script 失败：{}', e)
         return False
 
 
+def finalize_spec(goal, actions, start_url):
+    """阶段三：探索成功后，把真实走通的动作序列反推成「节点规范草稿」文本。"""
+    from .prompts import build_finalize_spec_prompt
+
+    actions_text = '\n'.join(
+        f'- {a.get("action")} ref={a.get("ref")} label={a.get("label", "")} text={a.get("text", "")} '
+        f'ms={a.get("ms", "")} url={a.get("url", "")} key={a.get("key", "")}'
+        for a in actions
+    ) or '（无动作）'
+    user = f'目标：{goal}\n起始页面：{start_url}\n实际执行成功的动作序列：\n{actions_text}'
+    messages = [
+        {'role': 'system', 'content': build_finalize_spec_prompt()},
+        {'role': 'user', 'content': user},
+    ]
+    reply = _call_ai(messages)
+    return reply
+
+
+def _empty_result(spec='', error=None, log_path=''):
+    return {'spec': spec, 'steps': [], 'passed': 0, 'failed': 0, 'total': 0,
+            'error': error, 'log_path': log_path}
+
+
 def run_explore(user_description):
-    """完整试运行：生成规范 → 翻译 → 执行 → 返回报告。
+    """完整试运行：提取 URL → 自主探索 → 反推规范 → 返回报告。
+
+    流程（agentic 探索，而不是盲写规范）：
+      1. 从用户描述提取起始 URL，无法提取则报错；
+      2. 注入巡检账号登录态，goto 起始 URL；
+      3. explorer.run_explore_loop 自主探索：AI 观察页面 → 决策 → 执行 → 失败回喂重试；
+      4. 探索成功后用真实动作序列反推「节点规范草稿」；失败则返回失败卡点 + 日志路径。
 
     返回 dict:
       {
-        'spec': str,                    # 节点规范草稿文本
-        'steps': [StepRunResult dict],  # 每步明细
+        'spec': str,                    # 节点规范草稿文本（探索成功后反推）
+        'steps': [StepRunResult dict],  # 每步明细（探索动作 + 结果）
         'passed': int, 'failed': int, 'total': int,
-        'error': str|None,
+        'error': str|None,              # 失败原因（探索失败/执行异常）
+        'log_path': str,                # 探索日志文件路径，用于排查
       }
     """
-    spec_text = generate_spec(user_description)
-    nodes = _parse_spec_to_nodes(spec_text)
+    from .explorer import run_explore_loop, explore_logger
 
-    if not nodes['precondition']:
-        return {'spec': spec_text, 'steps': [], 'passed': 0, 'failed': 0, 'total': 0,
-                'error': '规范草稿中未提取到页面地址（precondition 需含 http 开头的 URL）'}
+    # 日志文件路径：与 base_utils.logger_base 的 sink 一致，格式 logs/case_explore_YYYY-MM-DD.log
+    import os
+    from datetime import datetime
+    from base_utils.logger_base import _log_dir
+    log_path = os.path.join(_log_dir, f'case_explore_{datetime.now():%Y-%m-%d}.log')
 
-    # 翻译成操作 JSON
-    steps_json = _call_ai(_build_translate_messages(spec_text))
-    steps, err = parse_steps_json(steps_json)
-    if err:
-        return {'spec': spec_text, 'steps': [], 'passed': 0, 'failed': 0, 'total': 0,
-                'error': f'操作 JSON 解析失败：{err}，AI 返回：{steps_json[:500]}'}
+    start_url = _extract_start_url(user_description)
+    if not start_url:
+        return _empty_result(error='用户描述中未找到页面地址（需含 http:// 或 https:// 开头的 URL）',
+                             log_path=log_path)
 
-    # 校验步骤
-    for i, s in enumerate(steps, start=1):
-        ok, msg = validate_step(s, i)
-        if not ok:
-            return {'spec': spec_text, 'steps': [], 'passed': 0, 'failed': 0, 'total': 0,
-                    'error': msg}
-
-    # 关联节点信息
-    steps = _merge_steps_with_nodes(steps, nodes)
-
-    # Playwright 无痕执行
-    step_logger = StepLogger(case_name=nodes['precondition'])
+    step_logger = StepLogger(case_name=start_url)
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
-            # 注入巡检账号登录态到 localStorage，避免访问 SSO 站点被重定向到登录页
-            _inject_explore_login(context, nodes['precondition'])
+            _inject_explore_login(context, start_url)
             page = context.new_page()
-            from .interpreter import execute_steps
-            ok, first_error = execute_steps(page, steps, step_logger)
+            page.goto(start_url, wait_until='domcontentloaded', timeout=30000)
+
+            success, actions, note = run_explore_loop(page, user_description)
+
+            # 探索结束后的页面截图
+            try:
+                page.screenshot(path='/tmp/zy_explore_last.png')
+            except Exception:  # noqa: BLE001
+                pass
+
+            if not success:
+                browser.close()
+                return _empty_result(error=f'AI 未能在页面上完成目标：{note}', log_path=log_path)
+
+            # 探索成功 → 反推规范
+            spec_text = finalize_spec(user_description, actions, start_url)
             browser.close()
     except Exception as e:  # noqa: BLE001
-        return {'spec': spec_text, 'steps': step_logger.to_list(),
-                'passed': 0, 'failed': 0, 'total': 0, 'error': f'执行器异常：{e}'}
+        explore_logger.error('[巡检探索] 执行器异常：{}', e)
+        return _empty_result(error=f'执行器异常：{e}', log_path=log_path)
 
-    passed, failed, total = step_logger.summary()
+    # 把探索动作整理成每步明细（供报告展示，页面只显示最终结果）
+    steps_detail = []
+    passed = 0
+    failed = 0
+    for i, a in enumerate(actions, start=1):
+        action = a.get('action', '')
+        target = a.get('ref') if a.get('ref') is not None else (a.get('url') or a.get('text') or '')
+        steps_detail.append({
+            'index': i, 'action': action, 'node_title': '', 'node_type': 'step',
+            'target': str(target), 'status': 'pass', 'message': '探索执行成功', 'cost_ms': 0,
+        })
+        passed += 1
+
+    explore_logger.info('[巡检探索] 探索完成，共 {} 个动作，规范草稿长度 {}', passed, len(spec_text or ''))
+
     return {
         'spec': spec_text,
-        'steps': step_logger.to_list(),
+        'steps': steps_detail,
         'passed': passed,
         'failed': failed,
-        'total': total,
-        'error': None if ok else first_error,
+        'total': passed,
+        'error': None,
+        'log_path': log_path,
     }

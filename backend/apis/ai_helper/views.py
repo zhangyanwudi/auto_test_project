@@ -676,16 +676,21 @@ def _format_case_explore_report(result):
     passed = result.get('passed', 0)
     failed = result.get('failed', 0)
     total = result.get('total', 0)
+    log_path = result.get('log_path') or ''
 
     lines = []
+
+    if error:
+        # 探索失败：页面只显示失败原因 + 排查日志路径，不展示盲写草稿
+        lines.append('❌ 巡检失败：AI 未能在页面上完成目标')
+        lines.append(f'原因：{error}')
+        if log_path:
+            lines.append(f'🔍 排查日志：{log_path}')
+        return '\n'.join(lines)
+
     lines.append('📋 巡检规范草稿')
     lines.append(spec)
     lines.append('')
-
-    if error:
-        lines.append(f'❌ 试运行失败：{error}')
-        return '\n'.join(lines)
-
     lines.append(f'🧪 试运行结果：通过 {passed} / 失败 {failed} / 共 {total} 步')
     lines.append('')
     for s in steps:
@@ -699,6 +704,8 @@ def _format_case_explore_report(result):
             + (f'：{msg}' if msg and s.get('status') != 'pass' else '')
         )
     lines.append('')
+    if log_path:
+        lines.append(f'🔍 探索日志：{log_path}')
     lines.append('👉 回复「确认固化」将该规范保存为用例；或重新发送 @生成巡检规范 重新生成。')
     return '\n'.join(lines)
 

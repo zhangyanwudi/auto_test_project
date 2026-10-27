@@ -15,14 +15,16 @@ class TokenInfo:
     claims: dict = field(default_factory=dict)  # token 解析出的 JWT 载荷
     user: dict = field(default_factory=dict)  # 用户信息（id/username/full_name 等）
 
+
 class KolEnum:
     """基建枚举"""
+
     class Channel(str, Enum):
-        Social_youtube="Social_youtube"
+        Social_youtube = "Social_youtube"
         Social_tiktok = "Social_tiktok"
 
     class PersonID(str, Enum):
-        ZnYan_kol="M915BFH9KV"
+        ZnYan_kol = "M915BFH9KV"
         ZnYan = "1215BBPJ21"
 
     class Domain(str, Enum):
@@ -209,7 +211,7 @@ class KolsysApi(KolEnum):
             "mi_web_user_token": json.dumps(self.default_token),
         }
 
-    def create_order(self, res_id:str,media_source_list:list[str], price:int=100):
+    def create_order(self, res_id: str, media_source_list: list[str], price: int = 100):
         """
         创建订单
         :param res_id:              达人ID
@@ -233,28 +235,29 @@ class KolsysApi(KolEnum):
                 }
             ]
             return json.dumps(price_infos, ensure_ascii=False)
+
         url = self.kol_url + "/kol/resource/order/create"
         payload = {
             "res_id": res_id,
-            "price_infos": _build_price_infos(media_source_list,price),
+            "price_infos": _build_price_infos(media_source_list, price),
             "activity_code": "CPN20261010092"
         }
-        status,resp=my_post(url, headers=self.headers, data=json.dumps(payload))
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
         if not status:
             return status, resp
         print(resp)
         # 成功返回数据示例      {'code': 0, 'data': {'order_id': '1215BBPJ21-26100036'}, 'message': 'ok'}
-        order_id=resp.get("data").get("order_id")
+        order_id = resp.get("data").get("order_id")
         return order_id
 
     def create_order_to_approval(self):
         """创建订单信息并提审"""
-        url=self.kol_url + "/kol/api/orders/approval/create"
+        url = self.kol_url + "/kol/api/orders/approval/create"
         """
         {"order_id":"1215BBPJ21-26100046","checks":[{"extra":"1","extra_ref":"1791884203431","kol_type":"","media_source":"Social_tiktok","video_type":"TT-直播-强商单","product_id":"BC","count":1,"max_count":100,"price":10,"max_cost":1000,"cost":10,"id":0,"cooperation_date":"2026-05","executor":"张岩","picture_links":"[{\\"url\\":\\"http://hwadmarket.youxi123.com/kol/resource/zhangyan02195/da2q0tg4533c73bghcog.png?Expires=4940742262&Signature=SpbifKKapWHv1iStBanFNxkfHXM%3D&UCloudPublicKey=TOKEN_bdf4d05e-8402-4ba5-b771-5b3561e1423a\\"},{\\"url\\":\\"http://hwadmarket.youxi123.com/kol/resource/zhangyan02195/da3eepivca1c73dp2no0.png?Expires=4940825958&Signature=OhUP%2BCjUOb5JroCzmzEiCbVOP0w%3D&UCloudPublicKey=TOKEN_bdf4d05e-8402-4ba5-b771-5b3561e1423a\\"}]","remark":"","region":"RU","nicknames":[{"label":"zy","value":92332438,"media_picture_links":"[\\"http://hwadmarket.youxi123.com/kol/resource/zhangyan02195/da2q0tg4533c73bghcog.png?Expires=4940742262\\u0026Signature=SpbifKKapWHv1iStBanFNxkfHXM%3D\\u0026UCloudPublicKey=TOKEN_bdf4d05e-8402-4ba5-b771-5b3561e1423a\\",\\"http://hwadmarket.youxi123.com/kol/resource/zhangyan02195/da3eepivca1c73dp2no0.png?Expires=4940825958\\u0026Signature=OhUP%2BCjUOb5JroCzmzEiCbVOP0w%3D\\u0026UCloudPublicKey=TOKEN_bdf4d05e-8402-4ba5-b771-5b3561e1423a\\"]"}],"media_info":"{\\"media_name\\":\\"zy\\",\\"media_id\\":92332438}","media_id":92332438,"media_name":""}],"expert_tag_ids":[16],"discount_tag_id":73,"audience_region":"RU"}
         """
 
-    def get_jp_regions(self, is_show_resp:bool=False):
+    def get_jp_regions(self, is_show_resp: bool = False):
         """
         获取日本--省
         :param is_show_resp:
@@ -290,7 +293,7 @@ class KolsysApi(KolEnum):
             print(json.dumps(resp))
         return status, resp
 
-    def update_video(self,performance_id,video_link,sparkcode=''):
+    def update_video(self, performance_id, video_link, sparkcode=''):
         """
         上传履约视频
         :param performance_id:
@@ -304,7 +307,7 @@ class KolsysApi(KolEnum):
                    "sparkcode": "#03ZQOY89388APKUhpDMxapfWX1lVc/GzwOd856py2h6WTgQ2dMGjOlM3xbAxfwk=",
                    "confirm_overissue": False}
 
-    def get_performances_order_details(self,order_id):
+    def get_performances_order_details(self, order_id):
         """
         获取履约订单详情
         :param order_id:
@@ -318,10 +321,13 @@ class KolsysApi(KolEnum):
         # print(json.dumps(order_info,indent=2))
         return status, order_info
 
-    def query_kol_users(self,count:int=10):
+    def query_kol_users(self, count: int = 10):
         """获取达人列表数据"""
         url = self.kol_url + "/kol/resource/query"
-        payload = {"page":1,"count":count,"kol_regions":[],"regions":[],"languages":[],"media_sources":[],"genders":[],"kol_types":[],"users":[],"creators":[],"res_id":"","kol_name":"","expert_tag_ids":[],"discount_tag_ids":[],"contact":"","media_name":"","range":[],"order_start_date":"","order_end_date":""}
+        payload = {"page": 1, "count": count, "kol_regions": [], "regions": [], "languages": [], "media_sources": [],
+                   "genders": [], "kol_types": [], "users": [], "creators": [], "res_id": "", "kol_name": "",
+                   "expert_tag_ids": [], "discount_tag_ids": [], "contact": "", "media_name": "", "range": [],
+                   "order_start_date": "", "order_end_date": ""}
         status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
 
         if not status:
@@ -331,19 +337,54 @@ class KolsysApi(KolEnum):
         if code != 0:
             return False, resp
 
-        users_info=resp.get("data").get("resources")
+        users_info = resp.get("data").get("resources")
         # print(json.dumps(users_info, indent=2))
         return status, users_info
 
-
     def query_kolsys_daren_list_data(self):
         """查询达人管理列表数据"""
+        url = self.kol_url + "/kol/resource/query"
+        payload = {"page": 1, "count": 10, "kol_regions": [], "regions": [], "languages": [], "media_sources": [],
+                   "genders": [], "kol_types": [], "users": [], "creators": [], "res_id": "", "kol_name": "",
+                   "expert_tag_ids": [], "discount_tag_ids": [], "contact": "", "media_name": "", "range": [],
+                   "order_start_date": "", "order_end_date": ""}
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
 
+        if not status:
+            return status, resp
+        code = resp.get("code")
 
+        if code != 0:
+            return False, resp
+
+        # print(json.dumps(resp))
+        data = resp.get("data")
+        return status, data
+
+    def query_kolsys_order_list_data(self):
+        """查询订单管理列表数据"""
+        url = self.kol_url + "/kol/resource/order/list"
+        payload = {"kol_regions": [], "regions": [], "languages": [], "kol_types": [], "users": [], "res_id": "",
+                   "kol_name": "", "contact": "", "media_name": "", "contract_id": "", "order_id": "", "status": [],
+                   "dateRange": ["", ""], "start_date": "", "end_date": "", "business_status": [],
+                   "contract_filter": "", "product_ids": [], "expert_tag_ids": [], "discount_tag_ids": [],
+                   "activity_name": "", "page": 1, "count": 10}
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
+
+        if not status:
+            return status, resp
+        code = resp.get("code")
+
+        if code != 0:
+            return False, resp
+
+        print(json.dumps(resp))
+        data = resp.get("data")
+        return status, data
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
-    user_email = "xiaojiaqi@hungrystudio.com"    # 组员
+    user_email = "xiaojiaqi@hungrystudio.com"  # 组员
     # user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
@@ -352,9 +393,10 @@ if __name__ == "__main__":
     # user_email='licongze@hungrystudio.com'
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
-    # user_email='zhangchunlan@hungrystudio.com'  # 春兰
-    kolsys_api.get_user_token(user_email, is_set_cache=True,
-                              domains=[KolEnum.Domain.KOL_TEST, KolEnum.Domain.KOL_DEV1])
+    # user_email='huangyunru@hungrystudio.com'  # 春兰
+    kolsys_api.get_user_token(user_email, is_set_cache=False,
+                              domains=[KolEnum.Domain.KOL_TEST])
+    kolsys_api.query_kolsys_order_list_data()
     # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])

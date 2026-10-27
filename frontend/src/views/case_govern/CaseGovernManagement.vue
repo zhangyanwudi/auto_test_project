@@ -24,13 +24,16 @@
             placeholder="搜索用例名称、模块、创建人…"
             class="search-input"
             :prefix-icon="Search"
+            @keyup.enter="onSearch"
+            @clear="onSearch"
           />
+          <el-button @click="onSearch">查询</el-button>
           <el-button type="primary" @click="openCreateDialog">新建用例</el-button>
           <el-button :loading="importing" @click="triggerImport">导入</el-button>
         </div>
         <el-table
           v-loading="loading"
-          :data="filteredList"
+          :data="list"
           border
           stripe
           style="width: 100%"
@@ -68,6 +71,18 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="list-pagination">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="pageSizes"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            background
+            @size-change="onPageSizeChange"
+            @current-change="onPageChange"
+          />
+        </div>
       </template>
     </el-card>
 
@@ -219,6 +234,11 @@ import AiChatDialog from '../../components/AiChatDialog.vue'
 const loading = ref(false)
 const list = ref([])
 const keyword = ref('')
+// 分页
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const pageSizes = [10, 20, 50, 100]
 const dialogVisible = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
@@ -275,25 +295,6 @@ function priorityTagType(v) {
   if (v === 2) return 'warning'
   return 'info'
 }
-
-function rowMatchesKeyword(row) {
-  const kw = (keyword.value || '').trim().toLowerCase()
-  if (!kw) return true
-  const parts = [
-    row.id,
-    row.case_name,
-    row.module,
-    row.creator,
-    row.description,
-    row.priority_label || priorityLabel(row.priority),
-    row.node_count,
-  ]
-    .filter((x) => x != null)
-    .map((x) => String(x).toLowerCase())
-  return parts.some((s) => s.includes(kw))
-}
-
-const filteredList = computed(() => list.value.filter((row) => rowMatchesKeyword(row)))
 
 // 列宽自适应：取表头与所有单元格的最长内容，× 字符宽度后 clamp 到 [min, max]
 const COL_CHAR_WIDTH = 14
@@ -442,13 +443,38 @@ function onMindClosed() {
 async function loadList() {
   loading.value = true
   try {
-    const res = await fetchCaseList()
-    list.value = res.code === 0 && Array.isArray(res.data) ? res.data : []
+    const res = await fetchCaseList({
+      page: page.value,
+      page_size: pageSize.value,
+      keyword: keyword.value.trim(),
+    })
+    if (res.code === 0 && res.data && !Array.isArray(res.data)) {
+      list.value = res.data.list || []
+      total.value = res.data.total || 0
+    } else {
+      list.value = []
+      total.value = 0
+    }
   } catch {
     list.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
+}
+
+function onSearch() {
+  page.value = 1
+  loadList()
+}
+
+function onPageChange() {
+  loadList()
+}
+
+function onPageSizeChange() {
+  page.value = 1
+  loadList()
 }
 
 function onCasePaste(e) {
@@ -661,6 +687,12 @@ defineExpose({
   flex: 1;
   min-width: 200px;
   max-width: 420px;
+}
+
+.list-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
 }
 
 .empty-sub {
