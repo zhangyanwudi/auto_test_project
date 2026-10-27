@@ -33,6 +33,24 @@ class KolEnum:
         KOL_DEV1 = "https://marketing-dev1.youxi123.com"
         MI_TEST = "https://mi-test.youxi123.com"
 
+    class KeyWordType(str, Enum):
+        """
+        活动管理    single--单关键词   compound--多关键词
+        """
+        SINGLE='single'
+        COMPOUND='compound'
+
+    class VideoTab(str,Enum):
+        """视频审核tab"""
+        PENDING = 'pending'
+        CONFIRMIGN='confirming'
+        COMPLETED='completed'
+
+    class SettleTab(str,Enum):
+        """结算明细审核tab"""
+        PENDING = 'TODO'
+        COMPLETED='DONE'
+
 
 class KolsysApi(KolEnum):
     # 用户邮箱
@@ -335,6 +353,7 @@ class KolsysApi(KolEnum):
         code = resp.get("code")
 
         if code != 0:
+            logger.error(f"接口状态码错误：{resp}")
             return False, resp
 
         users_info = resp.get("data").get("resources")
@@ -355,6 +374,7 @@ class KolsysApi(KolEnum):
         code = resp.get("code")
 
         if code != 0:
+            logger.error(f"接口状态码错误：{resp}")
             return False, resp
 
         # print(json.dumps(resp))
@@ -376,11 +396,136 @@ class KolsysApi(KolEnum):
         code = resp.get("code")
 
         if code != 0:
+            logger.error(f"接口状态码错误：{resp}")
             return False, resp
 
-        print(json.dumps(resp))
         data = resp.get("data")
         return status, data
+
+    def query_kolsys_contract_list_data(self):
+        """查询合同列表数据"""
+        url=self.kol_url + "/kol/api/contracts/list"
+        params={"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kolsys_performances_list_data(self):
+        """获取履约列表数据"""
+        url=self.kol_url + "/kol/api/performances/list"
+        params = {"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kolsys_video_list_data(self):
+        """查询视频管理列表数据"""
+        url=self.kol_url + "/kol/api/videos/list"
+        params = {"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kolsys_settle_detail_list_data(self):
+        """查询结算明细管理列表"""
+        url=self.kol_url + "/kol/api/settle-detail/list"
+        params = {"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kolsys_payees_list_data(self):
+        """查询收款单位列表"""
+        url=self.kol_url + "/kol/api/payees/list"
+        params = {"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kolsys_activities_list_data(self):
+        """查询活动列表数据"""
+        url=self.kol_url + "/kol/api/activities/list"
+        params = {"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kolsys_creatives_list_data(self):
+        """查询创意列表数据"""
+        url=self.kol_url + "/kol/api/creatives/list"
+        params = {"page": 1, "count": 10}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_kilsys_hashtag_list_data(self,keyword_type):
+        """
+        活动管理-hashtag
+        :param keyword_type:      关键词
+        """
+        url=self.kol_url + "/kol/api/hashtag-configs"
+        params = {"page": 1, "count": 10,"keyword_type":keyword_type}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_order_reviews_list_data(self):
+        """查询订单审核列表"""
+        url=self.kol_url + "/kol/api/orders/approval/commits"
+        payload = {"users":[],"product_ids":[],"regions":[],"kol_regions":[],"kol_types":[],"res_id":"","contact":"","kol_name":"","languages":[],"media_name":"","current_approver":[],"activity_name":"","order_status":[],"status":[],"page":1,"count":10,"desc":True}
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
+        if not status:
+            return status, resp
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_video_reviews_list_data(self,tab_type):
+        """查询视频审核列表"""
+        url=self.kol_url + "/kol/api/video-reviews/list"
+        params={"tab":tab_type,"page":1,"page_size":20}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        # logger.debug(json.dumps(resp))
+        return status, resp
+
+    def query_settle_detail_list_data(self,tab_type):
+        """
+        查询结算明细审核列表数据
+        :param tab_type:     见SettleTab
+        """
+        url=self.kol_url + "/kol/api/settle-detail/approve/list"
+        params={"list_type":tab_type,"page":1,"page_size":20}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        logger.debug(json.dumps(resp))
+        return status, resp
+
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
@@ -396,7 +541,7 @@ if __name__ == "__main__":
     # user_email='huangyunru@hungrystudio.com'  # 春兰
     kolsys_api.get_user_token(user_email, is_set_cache=False,
                               domains=[KolEnum.Domain.KOL_TEST])
-    kolsys_api.query_kolsys_order_list_data()
+    kolsys_api.query_settle_detail_list_data(tab_type=KolEnum.SettleTab.PENDING)
     # kolsys_api.get_performances_order_details(order_id="1215BBPJ21-26100046")
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
