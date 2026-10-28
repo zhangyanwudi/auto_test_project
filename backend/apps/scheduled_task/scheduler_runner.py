@@ -10,8 +10,13 @@ from apscheduler.triggers.cron import CronTrigger
 from django.conf import settings
 from django.db import close_old_connections
 
-from apps.scheduled_task.executor import execute_task_once, persist_task_run_result, validate_cron
-from apps.scheduled_task.models import ZScheduledTask
+from apps.scheduled_task.executor import (
+    execute_task_once,
+    finalize_task_run,
+    try_mark_task_running,
+    validate_cron,
+)
+from apps.scheduled_task.models import ZScheduledTask, ZScheduledTaskRunLog
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +41,17 @@ def run_scheduled_task(task_id: int):
         t.task_file_name,
         t.cron_expression,
     )
-    ok, msg, detail = execute_task_once(t)
-    persist_task_run_result(t, ok, msg, detail)
+    if not try_mark_task_running(t.id):
+        logger.warning('Cron 跳过：任务 id=%s code=%s 正在执行中', t.id, t.task_code)
+        return
+    try:
+        ok, msg, detail = execute_task_once(t)
+    except Exception:
+        logger.exception('Cron 执行异常：id=%s code=%s', t.id, t.task_code)
+        ZScheduledTask.objects.filter(pk=t.id).update(is_running=False)
+        return
+    t = ZScheduledTask.objects.get(pk=t.id)
+    finalize_task_run(t, ok, msg, detail, trigger_type=ZScheduledTaskRunLog.TRIGGER_CRON)
     if ok:
         logger.info('Cron 执行成功：id=%s code=%s %s', t.id, t.task_code, msg)
     else:

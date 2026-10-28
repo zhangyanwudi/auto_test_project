@@ -8,19 +8,35 @@ from django.views.decorators.http import require_http_methods
 
 from apps.scheduled_task.executor import (
     CRON_5,
-    build_run_result,
     execute_task_once,
+    finalize_task_run,
     list_task_file_names,
     normalize_task_file_basename,
     parse_stored_run_detail,
-    persist_task_run_result,
     task_file_allowed,
+    try_mark_task_running,
     validate_cron,
 )
-from apps.scheduled_task.models import ZScheduledTask
+from apps.scheduled_task.models import ZScheduledTask, ZScheduledTaskRunLog
 from apps.users.decorators import require_valid_token
+from base_utils.time_base import format_datetime_utc8
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_run_log(run_log: ZScheduledTaskRunLog):
+    """序列化执行日志（时间统一走 UTC+8，详情 JSON 解析后返回）。"""
+    return {
+        'id': run_log.id,
+        'task_id': run_log.task_id,
+        'trigger_type': run_log.trigger_type,
+        'start_time': format_datetime_utc8(run_log.start_time),
+        'end_time': format_datetime_utc8(run_log.end_time) if run_log.end_time else None,
+        'duration_ms': run_log.duration_ms,
+        'success': run_log.success,
+        'message': run_log.message or '',
+        'detail': parse_stored_run_detail(run_log.detail_json or '') or {},
+    }
 
 
 def _serialize(t: ZScheduledTask):
@@ -33,6 +49,7 @@ def _serialize(t: ZScheduledTask):
         'execution_type': getattr(t, 'execution_type', None) or 'file',
         'task_file_name': getattr(t, 'task_file_name', None) or '',
         'status': t.status,
+        'is_running': bool(t.is_running),
         'last_run_time': t.last_run_time.isoformat() if t.last_run_time else None,
         'last_run_success': t.last_run_success,
         'last_run_message': t.last_run_message or '',
@@ -173,13 +190,32 @@ def task_status(request, pk):
     return JsonResponse({'code': 0, 'message': '已更新', 'data': _serialize(t)})
 
 
+def _run_task_in_background(task_id, task_file_name_override=None):
+    """后台线程执行任务：抢占运行标记 → 执行 → 落结果/日志并清除运行标记。"""
+    import threading
+    from django.db import close_old_connections
+
+    def _run():
+        close_old_connections()
+        try:
+            task = ZScheduledTask.objects.get(pk=task_id)
+        except ZScheduledTask.DoesNotExist:
+            return
+        ok, msg, detail = execute_task_once(task, task_file_name_override=task_file_name_override)
+        task = ZScheduledTask.objects.get(pk=task_id)
+        finalize_task_run(task, ok, msg, detail, trigger_type=ZScheduledTaskRunLog.TRIGGER_MANUAL)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 @require_valid_token
 def task_run_now(request, pk):
     """
-    立即运行一次：按任务配置执行 task_file 下脚本，并刷新 last_run_time。
+    立即运行一次（异步）：后台线程执行 task_file 下脚本，接口立即返回。
     可选 POST JSON：{"task_file_name": "test_run_task.py"} 覆盖本次运行的文件名（仍须在 task_file 目录下且通过校验）。
+    执行期间任务 is_running=1，前端轮询刷新展示「运行中」，跑完后落日志并可查看详情。
     """
     try:
         t = ZScheduledTask.objects.get(pk=pk)
@@ -189,19 +225,11 @@ def task_run_now(request, pk):
     override = body.get('task_file_name')
     if override is not None and str(override).strip() == '':
         override = None
-    ok, msg, detail = execute_task_once(t, task_file_name_override=override)
-    persist_task_run_result(t, ok, msg, detail)
+    if not try_mark_task_running(t.id):
+        return JsonResponse({'code': 409, 'message': '任务正在执行中，请稍后再试'}, status=409)
+    _run_task_in_background(t.id, task_file_name_override=override)
     t.refresh_from_db()
-    data = _serialize(t)
-    run_result = build_run_result(ok, msg, detail)
-    data['run_result'] = run_result
-    return JsonResponse(
-        {
-            'code': 0,
-            'message': run_result['message'],
-            'data': data,
-        }
-    )
+    return JsonResponse({'code': 0, 'message': '已开始执行', 'data': _serialize(t)})
 
 
 @csrf_exempt
@@ -215,3 +243,16 @@ def task_delete(request, pk):
         return JsonResponse({'code': 404, 'message': '任务不存在'}, status=404)
     t.delete()
     return JsonResponse({'code': 0, 'message': '已删除'})
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+@require_valid_token
+def task_run_logs(request, pk):
+    """查询指定任务的执行日志列表（按执行时间倒序，最多返回 100 条）。"""
+    try:
+        ZScheduledTask.objects.get(pk=pk)
+    except ZScheduledTask.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '任务不存在'}, status=404)
+    qs = ZScheduledTaskRunLog.objects.filter(task_id=pk).order_by('-id')[:100]
+    return JsonResponse({'code': 0, 'data': [_serialize_run_log(rl) for rl in qs]})

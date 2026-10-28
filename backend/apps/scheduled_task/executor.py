@@ -8,13 +8,15 @@ import platform
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from django.conf import settings
 from django.utils import timezone
 
-from apps.scheduled_task.models import ZScheduledTask
+from apps.scheduled_task.models import ZScheduledTask, ZScheduledTaskRunLog
 from base_utils.task_result_base import TASK_RESULT_FORMAT_HINT
+from base_utils.time_base import format_datetime_utc8
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +33,18 @@ def build_run_result(ok: bool, message: str, detail=None) -> dict:
     }
 
 
+def _json_default(obj):
+    """json.dumps 的 default 处理：datetime 统一转 UTC+8 字符串，避免序列化失败。"""
+    if isinstance(obj, datetime):
+        return format_datetime_utc8(obj)
+    return str(obj)
+
+
 def _detail_to_json(detail) -> str:
     if not detail:
         return ''
     try:
-        s = json.dumps(detail, ensure_ascii=False)
+        s = json.dumps(detail, ensure_ascii=False, default=_json_default)
     except (TypeError, ValueError):
         return ''
     if len(s) > _MAX_DETAIL_JSON:
@@ -58,6 +67,50 @@ def persist_task_run_result(task: ZScheduledTask, ok: bool, message: str, detail
         ]
     )
     return task
+
+
+def persist_task_run_log(task_id, trigger_type, ok, message, detail=None, start_time=None, end_time=None):
+    """写入一条执行日志记录（立即运行与定时调度共用）。"""
+    start = start_time or timezone.now()
+    end = end_time or timezone.now()
+    duration_ms = int((end - start).total_seconds() * 1000)
+    if duration_ms < 0:
+        duration_ms = 0
+    return ZScheduledTaskRunLog.objects.create(
+        task_id=int(task_id),
+        trigger_type=trigger_type or ZScheduledTaskRunLog.TRIGGER_MANUAL,
+        start_time=start,
+        end_time=end,
+        duration_ms=duration_ms,
+        success=bool(ok),
+        message=(message or '')[:512],
+        detail_json=_detail_to_json(detail),
+    )
+
+
+def try_mark_task_running(task_id):
+    """尝试把任务标记为「运行中」（CAS：仅当空闲时置 1）。
+
+    返回 True 表示抢占成功、可执行；False 表示已在运行中，应跳过本次执行。
+    """
+    updated = ZScheduledTask.objects.filter(pk=task_id, is_running=False).update(is_running=True)
+    return updated == 1
+
+
+def finalize_task_run(task: ZScheduledTask, ok: bool, message: str, detail=None, trigger_type=None):
+    """任务执行收尾：落结果、写日志、清除运行中标记（立即运行与定时调度共用）。"""
+    try:
+        persist_task_run_result(task, ok, message, detail)
+    finally:
+        persist_task_run_log(
+            task_id=task.id,
+            trigger_type=trigger_type or ZScheduledTaskRunLog.TRIGGER_MANUAL,
+            ok=ok,
+            message=message,
+            detail=detail,
+            start_time=(detail or {}).get('start_time'),
+        )
+        ZScheduledTask.objects.filter(pk=task.id).update(is_running=False)
 
 
 def parse_stored_run_detail(raw: str):
@@ -274,28 +327,31 @@ def _subprocess_env():
 def execute_task_once(task, task_file_name_override=None):
     """
     执行一次任务。返回 (ok: bool, message: str, detail: dict)
+
+    detail 中统一附带 'start_time' / 'end_time' / 'duration_ms'，供写执行日志使用。
     """
+    started = timezone.now()
     et = (task.execution_type or 'file').strip() or 'file'
     if et != 'file':
-        return False, '当前任务为「其他」类型，无可执行文件', {}
+        return False, '当前任务为「其他」类型，无可执行文件', {'start_time': started}
     raw = (task.task_file_name or '').strip()
     if task_file_name_override is not None and str(task_file_name_override).strip() != '':
         raw = str(task_file_name_override).strip()
     name = normalize_task_file_basename(raw)
     task_root = task_file_dir()
     if not name:
-        return False, '未配置执行文件名（task_file_name）', {}
+        return False, '未配置执行文件名（task_file_name）', {'start_time': started}
     if not task_file_allowed(name):
         expected = (task_root.resolve() / name).resolve()
         hint = (
             f'服务器上未找到或未授权该文件：{raw!r}（解析为 {name!r}）。'
             f'请将文件放到服务端目录：{task_root.resolve()}（期望路径：{expected}）。'
         )
-        return False, hint, {'expected_path': str(expected)}
+        return False, hint, {'start_time': started, 'expected_path': str(expected)}
     script_path = (task_root / name).resolve()
     cmd, err = _build_run_command(script_path)
     if err:
-        return False, err, {'command': cmd, 'script_path': str(script_path)}
+        return False, err, {'start_time': started, 'command': cmd, 'script_path': str(script_path)}
     cwd = str(Path(settings.BASE_DIR).resolve())
     detail_base = {
         'command': cmd,
@@ -317,11 +373,11 @@ def execute_task_once(task, task_file_name_override=None):
         logger.info('scheduled_task run done: returncode=%s', proc.returncode)
         _log_captured_subprocess_io(proc.stdout, proc.stderr)
     except subprocess.TimeoutExpired:
-        return False, '执行超时（超过 600 秒）', {**detail_base, 'returncode': None}
+        return False, '执行超时（超过 600 秒）', {**detail_base, 'start_time': started, 'returncode': None}
     except Exception as e:
         logger.exception('scheduled_task run failed: %s', e)
-        return False, f'执行过程异常：{e}', detail_base
-    detail = {**detail_base, 'returncode': proc.returncode}
+        return False, f'执行过程异常：{e}', {**detail_base, 'start_time': started}
+    detail = {**detail_base, 'start_time': started, 'returncode': proc.returncode}
     parsed, parse_err = parse_task_script_result(proc.stdout)
     if parsed is not None:
         ok = parsed['success']

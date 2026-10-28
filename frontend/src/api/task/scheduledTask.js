@@ -58,3 +58,8 @@ export async function deleteScheduledTask(id) {
   })
   return res.json()
 }
+
+export async function fetchTaskRunLogs(id) {
+  const res = await requestWithToken(`${BASE}/tasks/${id}/logs/`)
+  return res.json()
+}

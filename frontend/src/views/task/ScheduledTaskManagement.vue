@@ -68,7 +68,8 @@
         <el-table-column label="任务结果" min-width="220">
           <template #default="{ row }">
             <div class="run-result-cell">
-              <el-tag v-if="row.last_run_success === true" type="success" size="small">成功</el-tag>
+              <el-tag v-if="row.is_running === true" type="warning" size="small">运行中</el-tag>
+              <el-tag v-else-if="row.last_run_success === true" type="success" size="small">成功</el-tag>
               <el-tag v-else-if="row.last_run_success === false" type="danger" size="small">失败</el-tag>
               <span v-else class="run-result-muted">未执行</span>
               <span
@@ -84,9 +85,9 @@
                 type="primary"
                 size="small"
                 class="run-result-detail-btn"
-                @click="openRunResultDialog(row)"
+                @click="openRunLogsDialog(row)"
               >
-                详情
+                日志
               </el-button>
             </div>
           </template>
@@ -111,7 +112,14 @@
             >
               {{ row.status === 1 ? '停用' : '启用' }}
             </el-button>
-            <el-button type="danger" size="small" @click="onDelete(row)">删除</el-button>
+            <el-button
+              type="danger"
+              size="small"
+              :disabled="row.status === 1"
+              @click="onDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -231,43 +239,78 @@
     </el-dialog>
 
     <el-dialog
-      v-model="runResultVisible"
-      title="任务返回结果"
+      v-model="runLogsVisible"
+      :title="runLogDetailView ? `执行详情 - ${runLogsTaskName}` : `执行日志 - ${runLogsTaskName}`"
       width="720px"
       destroy-on-close
-      class="run-result-dialog"
+      @closed="onRunLogsDialogClosed"
     >
-      <div class="run-result-head">
-        <el-tag :type="runResultView.success ? 'success' : 'danger'" size="large">
-          {{ runResultView.success ? 'true · 成功' : 'false · 失败' }}
-        </el-tag>
-        <span v-if="runResultView.taskName" class="run-result-task-name">{{ runResultView.taskName }}</span>
+      <!-- 列表视图 -->
+      <div v-if="!runLogDetailView" v-loading="runLogsLoading">
+        <el-empty v-if="!runLogsLoading && runLogs.length === 0" description="暂无执行记录" :image-size="72" />
+        <el-table v-else :data="runLogs" border stripe style="width: 100%">
+          <el-table-column prop="start_time" label="执行时间" min-width="170" show-overflow-tooltip />
+          <el-table-column label="触发方式" width="100">
+            <template #default="{ row }">
+              {{ row.trigger_type === 'cron' ? '定时调度' : '立即运行' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="执行时长" width="120">
+            <template #default="{ row }">
+              {{ formatDuration(row.duration_ms) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="结果" width="80">
+            <template #default="{ row }">
+              <el-tag :type="row.success ? 'success' : 'danger'" size="small">
+                {{ row.success ? '成功' : '失败' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="90" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="openRunLogDetail(row)">
+                详情
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
-      <p class="run-result-message">
-        <span class="run-result-label">返回说明：</span>{{ runResultView.message || '—' }}
-      </p>
-      <template v-if="runResultView.metaText">
-        <p class="run-result-section-title">运行环境</p>
-        <pre class="run-result-pre">{{ runResultView.metaText }}</pre>
-      </template>
-      <template v-if="runResultView.successMsgs.length">
-        <p class="run-result-section-title">成功消息</p>
-        <pre class="run-result-pre">{{ runResultView.successMsgs.join('\n') }}</pre>
-      </template>
-      <template v-if="runResultView.failMsgs.length">
-        <p class="run-result-section-title">失败消息</p>
-        <pre class="run-result-pre run-result-pre-err">{{ runResultView.failMsgs.join('\n') }}</pre>
-      </template>
-      <template v-if="runResultView.stdout">
-        <p class="run-result-section-title">标准输出</p>
-        <pre class="run-result-pre">{{ runResultView.stdout }}</pre>
-      </template>
-      <template v-if="runResultView.stderr">
-        <p class="run-result-section-title">标准错误</p>
-        <pre class="run-result-pre run-result-pre-err">{{ runResultView.stderr }}</pre>
-      </template>
+      <!-- 详情视图：复用结果弹窗的展示结构 -->
+      <div v-else class="run-result-body">
+        <div class="run-result-head">
+          <el-tag :type="runResultView.success ? 'success' : 'danger'" size="large">
+            {{ runResultView.success ? 'true · 成功' : 'false · 失败' }}
+          </el-tag>
+          <span v-if="runResultView.taskName" class="run-result-task-name">{{ runResultView.taskName }}</span>
+        </div>
+        <p class="run-result-message">
+          <span class="run-result-label">返回说明：</span>{{ runResultView.message || '—' }}
+        </p>
+        <template v-if="runResultView.metaText">
+          <p class="run-result-section-title">运行环境</p>
+          <pre class="run-result-pre">{{ runResultView.metaText }}</pre>
+        </template>
+        <template v-if="runResultView.successMsgs.length">
+          <p class="run-result-section-title">成功消息</p>
+          <pre class="run-result-pre">{{ runResultView.successMsgs.join('\n') }}</pre>
+        </template>
+        <template v-if="runResultView.failMsgs.length">
+          <p class="run-result-section-title">失败消息</p>
+          <pre class="run-result-pre run-result-pre-err">{{ runResultView.failMsgs.join('\n') }}</pre>
+        </template>
+        <template v-if="runResultView.stdout">
+          <p class="run-result-section-title">标准输出</p>
+          <pre class="run-result-pre">{{ runResultView.stdout }}</pre>
+        </template>
+        <template v-if="runResultView.stderr">
+          <p class="run-result-section-title">标准错误</p>
+          <pre class="run-result-pre run-result-pre-err">{{ runResultView.stderr }}</pre>
+        </template>
+      </div>
       <template #footer>
-        <el-button type="primary" @click="runResultVisible = false">关闭</el-button>
+        <el-button v-if="runLogDetailView" @click="runLogDetailView = false">返回</el-button>
+        <el-button type="primary" @click="runLogsVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -280,6 +323,7 @@ import { Search } from '@element-plus/icons-vue'
 import {
   fetchScheduledTaskList,
   fetchTaskFileNames,
+  fetchTaskRunLogs,
   createScheduledTask,
   updateScheduledTask,
   setScheduledTaskStatus,
@@ -309,7 +353,6 @@ const editingId = ref(null)
 const formRef = ref(null)
 /** 正在「立即运行」的任务 id，用于按钮 loading */
 const runningTaskId = ref(null)
-const runResultVisible = ref(false)
 const runResultView = reactive({
   success: false,
   taskName: '',
@@ -320,6 +363,13 @@ const runResultView = reactive({
   stdout: '',
   stderr: '',
 })
+
+const runLogsVisible = ref(false)
+const runLogsLoading = ref(false)
+const runLogs = ref([])
+const runLogsTaskName = ref('')
+/** 日志弹窗当前是否处于「详情」视图（false-列表视图） */
+const runLogDetailView = ref(false)
 
 const showEmptyHint = computed(() => !loading.value && list.value.length === 0)
 
@@ -634,6 +684,7 @@ async function submitForm() {
 function isRunNowDisabled(row) {
   if ((row.execution_type || 'file') !== 'file') return true
   if (!(row.task_file_name || '').trim()) return true
+  if (row.is_running === true) return true
   return false
 }
 
@@ -679,9 +730,53 @@ function fillRunResultView(row, runResult) {
   runResultView.stderr = String(d.stderr || '').trim()
 }
 
-function openRunResultDialog(row, runResult) {
-  fillRunResultView(row, runResult)
-  runResultVisible.value = true
+function formatDuration(durationMs) {
+  const ms = Number(durationMs) || 0
+  if (ms < 1000) return `${ms}ms`
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  const minutes = Math.floor(seconds / 60)
+  const remain = Math.round(seconds % 60)
+  return `${minutes}m${remain}s`
+}
+
+async function openRunLogsDialog(row) {
+  runLogsTaskName.value = row.task_name || ''
+  runLogDetailView.value = false
+  runLogsVisible.value = true
+  runLogsLoading.value = true
+  try {
+    const res = await fetchTaskRunLogs(row.id)
+    runLogs.value = res.code === 0 && Array.isArray(res.data) ? res.data : []
+  } catch {
+    runLogs.value = []
+  } finally {
+    runLogsLoading.value = false
+  }
+}
+
+function onRunLogsDialogClosed() {
+  runLogs.value = []
+  runLogsTaskName.value = ''
+  runLogDetailView.value = false
+}
+
+function openRunLogDetail(runLog) {
+  // 在日志弹窗内切换到详情视图，不再新开结果弹窗
+  fillRunResultView(
+    {
+      task_name: runLogsTaskName.value,
+      last_run_success: runLog.success,
+      last_run_message: runLog.message,
+      last_run_detail: runLog.detail,
+    },
+    {
+      success: runLog.success,
+      message: runLog.message,
+      detail: runLog.detail,
+    },
+  )
+  runLogDetailView.value = true
 }
 
 async function runTaskNow(row) {
@@ -693,28 +788,36 @@ async function runTaskNow(row) {
       ElMessage.error(res.message || '请求失败')
       return
     }
-    const data = res.data || {}
-    const rr = data.run_result
+    ElMessage.success(res.message || '已开始执行')
     await loadList()
-    openRunResultDialog(
-      {
-        task_name: data.task_name || row.task_name,
-        last_run_success: rr?.success,
-        last_run_message: rr?.message,
-        last_run_detail: rr?.detail,
-      },
-      rr,
-    )
-    if (rr?.success) {
-      ElMessage.success(rr.message || '执行成功')
-    } else {
-      ElMessage.warning(rr?.message || '执行失败')
-    }
+    startRunPolling(row.id)
   } catch (e) {
     ElMessage.error(e.message || '请求失败')
   } finally {
     runningTaskId.value = null
   }
+}
+
+/** 立即运行后轮询刷新，直到任务运行结束（is_running=false） */
+function startRunPolling(taskId) {
+  let attempts = 0
+  const MAX_ATTEMPTS = 200 // 约 200 * 2s = 400s，超出则停止轮询
+  const timer = setInterval(async () => {
+    attempts += 1
+    if (attempts > MAX_ATTEMPTS) {
+      clearInterval(timer)
+      return
+    }
+    try {
+      await loadList()
+      const row = list.value.find((x) => x.id === taskId)
+      if (!row || row.is_running !== true) {
+        clearInterval(timer)
+      }
+    } catch {
+      clearInterval(timer)
+    }
+  }, 2000)
 }
 
 async function toggleStatus(row) {
