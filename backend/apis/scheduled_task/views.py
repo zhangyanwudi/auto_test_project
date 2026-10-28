@@ -50,12 +50,12 @@ def _serialize(t: ZScheduledTask):
         'task_file_name': getattr(t, 'task_file_name', None) or '',
         'status': t.status,
         'is_running': bool(t.is_running),
-        'last_run_time': t.last_run_time.isoformat() if t.last_run_time else None,
+        'last_run_time': format_datetime_utc8(t.last_run_time) if t.last_run_time else None,
         'last_run_success': t.last_run_success,
         'last_run_message': t.last_run_message or '',
         'last_run_detail': parse_stored_run_detail(getattr(t, 'last_run_detail', None) or ''),
-        'create_time': t.create_time.isoformat() if t.create_time else None,
-        'update_time': t.update_time.isoformat() if t.update_time else None,
+        'create_time': format_datetime_utc8(t.create_time) if t.create_time else None,
+        'update_time': format_datetime_utc8(t.update_time) if t.update_time else None,
     }
 
 
