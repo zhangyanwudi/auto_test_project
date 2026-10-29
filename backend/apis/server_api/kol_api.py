@@ -77,6 +77,8 @@ class KolsysApi(KolEnum):
             self.kol_url = "https://marketing.youxi123.com"
             self.kolline_url = "https://kol-link.youxi123.com"
         self.headers = {"Authorization": f"Bearer {self.default_token}"}
+        # 公共参数
+        self.user_name=""
 
     def _update_headers(self):
         """更新headers"""
@@ -99,7 +101,7 @@ class KolsysApi(KolEnum):
         params = {"email": user_email}
         logger.info(f"获取用户 token，email=【{user_email}】")
         status, resp = my_get(url, headers=self.headers, params=params)
-        print(resp)
+        logger.info(resp)
         if not status:
             return status, resp
         #
@@ -109,6 +111,7 @@ class KolsysApi(KolEnum):
         data = resp.get("data")
         # 更新token
         self.default_token = data.get("token")
+        self.user_name =data.get("user",{}).get("username","")
         self._update_headers()
         # 输出用户信息
         info = TokenInfo(
@@ -119,6 +122,7 @@ class KolsysApi(KolEnum):
         print(f"token:{info.token}")
         print(f"claims:{info.claims}")
         print(f"user:{info.user}")
+
         if is_set_cache:
             self._set_user_cache(user_email, data, domains=domains)
         return True, info
@@ -273,7 +277,7 @@ class KolsysApi(KolEnum):
         status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
         if not status:
             return status, resp
-        print(resp)
+        logger.info(resp)
         # 成功返回数据示例      {'code': 0, 'data': {'order_id': '1215BBPJ21-26100036'}, 'message': 'ok'}
         order_id = resp.get("data").get("order_id")
         return order_id
@@ -299,7 +303,7 @@ class KolsysApi(KolEnum):
         if not status:
             return status, resp
         if is_show_resp:
-            print(json.dumps(resp))
+            logger.info(json.dumps(resp))
         return status, resp
 
     def get_jp_cities(self, regions_id: int, is_show_resp: bool = False):
@@ -318,7 +322,7 @@ class KolsysApi(KolEnum):
         if not status:
             return status, resp
         if is_show_resp:
-            print(json.dumps(resp))
+            logger.info(json.dumps(resp))
         return status, resp
 
     def update_video(self, performance_id, video_link, sparkcode=''):
@@ -574,7 +578,7 @@ class KolsysApi(KolEnum):
 
         code = resp.get("code", -1)
         if code != 0:
-            return status, resp
+            return False, resp
         # logger.debug(json.dumps(resp, indent=2))
         email_list = resp.get("data", {}).get("list", [])
         return status, email_list
@@ -589,7 +593,7 @@ class KolsysApi(KolEnum):
 
         code = resp.get("code", -1)
         if code != 0:
-            return status, resp
+            return False, resp
         # logger.debug(json.dumps(resp, indent=2))
         email_list = resp.get("data", {}).get("list", [])
         return status, email_list
@@ -604,7 +608,7 @@ class KolsysApi(KolEnum):
 
         code = resp.get("code", -1)
         if code != 0:
-            return status, resp
+            return False, resp
         # logger.debug(json.dumps(resp, indent=2))
         email_list = resp.get("data", {}).get("list", [])
         return status, email_list
@@ -612,12 +616,12 @@ class KolsysApi(KolEnum):
     def query_data_analysis_by_daren_select(self, task_source,count: int = 10):
         """获取数据分析列表数据"""
         url = self.kolline_url + "/kollink/api/email/batches"
-        "status=sending&status=partial_completed&status=completed&status=failed&date_start=2026-09-29&date_end=2026-10-28&page=1&page_size=10&task_source=selected"
         params = [
             ("status", "sending"),
             ("status", "partial_completed"),
             ("status", "completed"),
             ("status", "failed"),
+            ("sender_users",self.user_name),
             ("date_start", get_before_date(days=30, template="Ymd")),
             ("date_end", get_before_date(days=0, template="Ymd")),
             ("page", "1"),
@@ -630,7 +634,7 @@ class KolsysApi(KolEnum):
             return status, resp
         code = resp.get("code", -1)
         if code != 0:
-            return status, resp
+            return False, resp
 
         # logger.debug(json.dumps(resp, indent=2))
         send_record = resp.get("data", {}).get("list", [])
@@ -641,7 +645,7 @@ if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
     # user_email='liuli@hungrystudio.com'   # 组员
-    user_email = "zhangyan02195@hungrystudio.com"  # 管理员
+    # user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长   dbbida8dupss73b6bht0
@@ -649,10 +653,10 @@ if __name__ == "__main__":
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
     # user_email='huangyunru@hungrystudio.com'  # 春兰
-    kolsys_api.get_user_token(user_email, is_set_cache=False,
+    kolsys_api.get_user_token(user_email, is_set_cache=True,
                               domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
-    kolsys_api.query_kolsys_performances_list_data()
+    # kolsys_api.query_kolsys_performances_list_data()
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
     # kolsys_api.get_jp_regions()
