@@ -104,12 +104,13 @@
       <el-input
         v-model="inputText"
         type="textarea"
-        :rows="2"
+        :rows="4"
+        :autosize="{ minRows: 4, maxRows: 10 }"
         placeholder="输入消息，Enter 发送，Shift+Enter 换行；支持拖拽或粘贴文件上传"
         :disabled="sending"
         @keydown.enter.exact="handleSend"
+        @keydown.enter.shift="handleNewline"
         @paste="onPaste"
-        resize="none"
       />
       <el-button
         type="primary"
@@ -424,6 +425,20 @@ const canSend = computed(() => {
   const hasUploading = uploadingSet.value.size > 0
   return (hasText || hasFiles) && !hasUploading
 })
+
+/** Shift+Enter：在光标处插入换行（多行录入） */
+function handleNewline(e) {
+  e.preventDefault()
+  const el = e.target
+  if (!el || typeof el.selectionStart !== 'number') return
+  const pos = el.selectionStart
+  const val = inputText.value
+  inputText.value = val.slice(0, pos) + '\n' + val.slice(el.selectionEnd)
+  // 下一帧把光标放到换行符之后
+  requestAnimationFrame(() => {
+    el.selectionStart = el.selectionEnd = pos + 1
+  })
+}
 
 /** 发送消息（支持文本 + 文件同时发送） */
 async function handleSend(e) {
@@ -754,9 +769,15 @@ async function handleSend(e) {
   margin-bottom: 1px;
 }
 
+.chat-input-area :deep(.el-textarea) {
+  flex: 1;
+}
+
 .chat-input-area :deep(.el-textarea__inner) {
   font-size: 14px;
   line-height: 1.55;
+  resize: vertical;
+  min-height: 92px;
 }
 
 /* ── 消息气泡 ── */

@@ -35,6 +35,7 @@ class KolEnum:
         KOL_TEST = "https://marketing-test.youxi123.com"
         KOL_DEV1 = "https://marketing-dev1.youxi123.com"
         MI_TEST = "https://mi-test.youxi123.com"
+        KOL_PRO="https://marketing.youxi123.com/"
 
     class KeyWordType(str, Enum):
         """
@@ -68,14 +69,17 @@ class KolsysApi(KolEnum):
         self.is_debug = is_debug
         # 默认测试环境
         self.default_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaXAiOiIzOS45Ni4yMjIuMjUiLCJjcmVhdGVkX2F0IjoxNzg3MTMxOTg1LCJlbWFpbCI6InpoYW5neWFuMDIxOTVAaHVuZ3J5c3R1ZGlvLmNvbSIsImZ1bGxfbmFtZSI6IuW8oOWyqSIsInVzZXJfaWQiOiI2YTg1NzI0NzNlNmJjMjAxNTdjOTJhZmIiLCJ1c2VybmFtZSI6InpoYW5neWFuMDIxOTUiLCJ3b3JrY29kZSI6IjAwMTIxNyJ9.R7byMV8nOdJTt8gaWbsx5zf_eMXU1Q_f_TVNarrCqG0"
-        self.mi_url = "https://iam-test.youxi123.com"
-        self.kol_url = "https://marketing-test.youxi123.com"
-        self.kolline_url = "https://kollink-test.afafb.com"
+        self.mi_url = "https://iam-test.youxi123.com"       # mi平台-测试
+        self.kol_url = "https://marketing-test.youxi123.com"    # 达人基建平台-测试
+        self.kolline_url = "https://kollink-test.afafb.com"     # 建联-测试
+        self.kol_delivery_url = "https://delivery-test.youxi123.com"    # 投流-测试
         if not self.is_debug:
             self.default_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaXAiOiIzOS4xNTUuMTcyLjM0IiwiY3JlYXRlZF9hdCI6MTc4OTkwNjA2NiwiZW1haWwiOiJ6aGFuZ3lhbjAyMTk1QGh1bmdyeXN0dWRpby5jb20iLCJmdWxsX25hbWUiOiLlvKDlsqkiLCJpc3MiOiJpYW0tbWkueW91eGkxMjMuY29tIiwidXNlcl9pZCI6IjZhODU3NGVhNWI1NTI4NjdkNGU1OGRhZCIsInVzZXJuYW1lIjoiemhhbmd5YW4wMjE5NSIsIndvcmtjb2RlIjoiMDAxMjE3In0.JUxuozq_6x2n4ZqytczLIhZmctGzmqEnfIBrzwNcFRY"
-            self.mi_url = "https://iam-mi.youxi123.com"
-            self.kol_url = "https://marketing.youxi123.com"
-            self.kolline_url = "https://kol-link.youxi123.com"
+            self.mi_url = "https://iam-mi.youxi123.com"     # mi平台-正式
+            self.kol_url = "https://marketing.youxi123.com"     # 达人基建平台-正式
+            self.kolline_url = "https://kol-link.youxi123.com"      # 建联-正式
+            self.kol_delivery_url = "https://delivery.youxi123.com"  # 投流-正式
+
         self.headers = {"Authorization": f"Bearer {self.default_token}"}
         # 公共参数
         self.user_name=""
@@ -644,8 +648,8 @@ class KolsysApi(KolEnum):
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
-    # user_email='liuli@hungrystudio.com'   # 组员
-    # user_email = "zhangyan02195@hungrystudio.com"  # 管理员
+    user_email='liuli@hungrystudio.com'   # 组员
+    user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长   dbbida8dupss73b6bht0
@@ -653,8 +657,9 @@ if __name__ == "__main__":
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
     # user_email='huangyunru@hungrystudio.com'  # 春兰
+    # user_email='xuebingqing@hungrystudio.com'  # CZ15FXK891-26100001
     kolsys_api.get_user_token(user_email, is_set_cache=True,
-                              domains=[KolEnum.Domain.KOL_TEST])
+                              domains=[KolEnum.Domain.KOL_TEST,KolEnum.Domain.MI_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
     # kolsys_api.query_kolsys_performances_list_data()
     # kolsys_api.query_kol_users()
