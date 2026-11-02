@@ -60,6 +60,15 @@ class KolEnum:
         Selected = "selected"  # 达人圈选
         Direct = "direct"  # 邮箱直联
 
+    class Platform(str, Enum):
+        """线索-平台"""
+        YouTuBe="youtube"
+        TikTok="TikTok"
+        VkVideo="vkvideo"
+
+    class Country(str, Enum):
+        """国家"""
+        RU='RU'
 
 class KolsysApi(KolEnum):
     # 用户邮箱
@@ -73,12 +82,14 @@ class KolsysApi(KolEnum):
         self.kol_url = "https://marketing-test.youxi123.com"    # 达人基建平台-测试
         self.kolline_url = "https://kollink-test.afafb.com"     # 建联-测试
         self.kol_delivery_url = "https://delivery-test.youxi123.com"    # 投流-测试
+        self.kol_leadhub_url = "https://kol-leadhub-stage.afafb.com"  # 线索库-测试
         if not self.is_debug:
             self.default_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaXAiOiIzOS4xNTUuMTcyLjM0IiwiY3JlYXRlZF9hdCI6MTc4OTkwNjA2NiwiZW1haWwiOiJ6aGFuZ3lhbjAyMTk1QGh1bmdyeXN0dWRpby5jb20iLCJmdWxsX25hbWUiOiLlvKDlsqkiLCJpc3MiOiJpYW0tbWkueW91eGkxMjMuY29tIiwidXNlcl9pZCI6IjZhODU3NGVhNWI1NTI4NjdkNGU1OGRhZCIsInVzZXJuYW1lIjoiemhhbmd5YW4wMjE5NSIsIndvcmtjb2RlIjoiMDAxMjE3In0.JUxuozq_6x2n4ZqytczLIhZmctGzmqEnfIBrzwNcFRY"
             self.mi_url = "https://iam-mi.youxi123.com"     # mi平台-正式
             self.kol_url = "https://marketing.youxi123.com"     # 达人基建平台-正式
             self.kolline_url = "https://kol-link.youxi123.com"      # 建联-正式
             self.kol_delivery_url = "https://delivery.youxi123.com"  # 投流-正式
+            self.kol_leadhub_url = "https://kol-leadhub-prod.afafb.com"  # 线索库-正式
 
         self.headers = {"Authorization": f"Bearer {self.default_token}"}
         # 公共参数
@@ -123,9 +134,9 @@ class KolsysApi(KolEnum):
             claims=data.get("claims") or {},
             user=data.get("user") or {},
         )
-        print(f"token:{info.token}")
-        print(f"claims:{info.claims}")
-        print(f"user:{info.user}")
+        logger.info(f"token:{info.token}")
+        logger.info(f"claims:{info.claims}")
+        logger.info(f"user:{info.user}")
 
         if is_set_cache:
             self._set_user_cache(user_email, data, domains=domains)
@@ -549,28 +560,41 @@ class KolsysApi(KolEnum):
         approvals = resp.get("data", {}).get("approvals", [])
         return status, approvals
 
-    def query_video_reviews_list_data(self, tab_type):
+    def query_order_reviews_list_data_by_dones(self, count: int = 10, **filters):
+        """查询订单审核列表-已审核"""
+        url = self.kol_url + "/kol/api/orders/approval/dones"
+        payload = self._build_order_reviews_payload(count=count, **filters)
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
+        if not status:
+            return status, resp
+        # logger.debug(json.dumps(resp,indent=2))
+        approvals = resp.get("data", {}).get("approvals", [])
+        return status, approvals
+
+    def query_video_reviews_list_data(self, tab_type,count:int=10):
         """查询视频审核列表"""
         url = self.kol_url + "/kol/api/video-reviews/list"
-        params = {"tab": tab_type, "page": 1, "page_size": 20}
+        params = {"tab": tab_type, "page": 1, "page_size": count}
         status, resp = my_get(url, headers=self.headers, params=params)
         if not status:
             return status, resp
-        # logger.debug(json.dumps(resp))
-        return status, resp
+        items = resp.get("items", [])
+        # logger.debug(json.dumps(items))
+        return status, items
 
-    def query_settle_detail_list_data(self, tab_type):
+    def query_settle_detail_list_data(self, tab_type,count:int=10):
         """
         查询结算明细审核列表数据
         :param tab_type:     见SettleTab
         """
         url = self.kol_url + "/kol/api/settle-detail/approve/list"
-        params = {"list_type": tab_type, "page": 1, "page_size": 20}
+        params = {"list_type": tab_type, "page": 1, "page_size": count}
         status, resp = my_get(url, headers=self.headers, params=params)
         if not status:
             return status, resp
-        # logger.debug(json.dumps(resp))
-        return status, resp
+        items = resp.get("items", [])
+        # logger.debug(json.dumps(items))
+        return status, items
 
     def query_kolline_daren_email_list_data(self,count: int = 10):
         """获取初次建联达人邮箱列表"""
@@ -645,6 +669,16 @@ class KolsysApi(KolEnum):
         return status, send_record
 
 
+    def get_leadhub_record(self,platform,countrys:list[""],count: int = 10,):
+        """获取线索库记录"""
+        url = self.kol_leadhub_url + "/leadhub/api/leads/pull"
+        payload = {"platform":platform,"countries":countrys,"requested_count":count}
+        status, resp = my_post(url, headers=self.headers, data=payload)
+        if not status:
+            return status, resp
+        logger.debug(json.dumps(resp, indent=4))
+
+
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
@@ -657,11 +691,11 @@ if __name__ == "__main__":
     # user_email='wangyaoying@hungrystudio.com'
     # user_email='liyajun@hungrystudio.com'
     # user_email='huangyunru@hungrystudio.com'  # 春兰
-    # user_email='xuebingqing@hungrystudio.com'  # CZ15FXK891-26100001
-    kolsys_api.get_user_token(user_email, is_set_cache=True,
-                              domains=[KolEnum.Domain.KOL_TEST,KolEnum.Domain.MI_TEST])
+    # user_email='liangxiaotong@hungrystudio.com'  # CZ15FXK891-26100001
+    kolsys_api.get_user_token(user_email, is_set_cache=False,
+                              domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
-    # kolsys_api.query_kolsys_performances_list_data()
+    kolsys_api.query_settle_detail_list_data(tab_type=KolEnum.SettleTab.COMPLETED)
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
     # kolsys_api.get_jp_regions()

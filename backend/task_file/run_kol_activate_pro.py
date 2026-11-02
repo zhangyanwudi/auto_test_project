@@ -144,6 +144,46 @@ CASES = [
         "func": lambda api: api.query_data_analysis_by_daren_select(task_source=KolEnum.TaskSource.Direct.value,count=10),
         "check": _check_list_has_data_by_none,
     },
+    {
+        "name": "获取订单审核列表-我发起",
+        "func": lambda api: api.query_order_reviews_list_data_by_me(count=10),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取订单审核列表-待审核",
+        "func": lambda api: api.query_order_reviews_list_data_by_pending(count=10),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取订单审核列表-已审核",
+        "func": lambda api: api.query_order_reviews_list_data_by_dones(count=10),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取视频审核列表-审核池",
+        "func": lambda api: api.query_video_reviews_list_data(count=10,tab_type=KolEnum.VideoTab.PENDING.value),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取视频审核列表-待审核",
+        "func": lambda api: api.query_video_reviews_list_data(count=10,tab_type=KolEnum.VideoTab.CONFIRMIGN.value),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取视频审核列表-已完成",
+        "func": lambda api: api.query_video_reviews_list_data(count=10,tab_type=KolEnum.VideoTab.COMPLETED.value),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取结算明细审核列表-待审核",
+        "func": lambda api: api.query_settle_detail_list_data(count=10,tab_type=KolEnum.SettleTab.PENDING.value),
+        "check": _check_list_has_data_by_none,
+    },
+    {
+        "name": "获取结算明细审核列表-已审核",
+        "func": lambda api: api.query_settle_detail_list_data(count=10,tab_type=KolEnum.SettleTab.COMPLETED.value),
+        "check": _check_list_has_data_by_none,
+    },
 ]
 
 
