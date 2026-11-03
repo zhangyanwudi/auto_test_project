@@ -35,7 +35,7 @@ class KolEnum:
         KOL_TEST = "https://marketing-test.youxi123.com"
         KOL_DEV1 = "https://marketing-dev1.youxi123.com"
         MI_TEST = "https://mi-test.youxi123.com"
-        KOL_PRO="https://marketing.youxi123.com/"
+        KOL_PRO="https://marketing.youxi123.com"
 
     class KeyWordType(str, Enum):
         """
@@ -88,7 +88,7 @@ class KolsysApi(KolEnum):
             self.mi_url = "https://iam-mi.youxi123.com"     # mi平台-正式
             self.kol_url = "https://marketing.youxi123.com"     # 达人基建平台-正式
             self.kolline_url = "https://kol-link.youxi123.com"      # 建联-正式
-            self.kol_delivery_url = "https://delivery.youxi123.com"  # 投流-正式
+            self.kol_delivery_url = "https://delivery-mi.youxi123.com"  # 投流-正式
             self.kol_leadhub_url = "https://kol-leadhub-prod.afafb.com"  # 线索库-正式
 
         self.headers = {"Authorization": f"Bearer {self.default_token}"}
@@ -678,6 +678,58 @@ class KolsysApi(KolEnum):
             return status, resp
         logger.debug(json.dumps(resp, indent=4))
 
+    def get_projects_list_data(self,count: int = 10):
+        """获取项目管理列表数据"""
+        url=self.kol_delivery_url+"/delivery/api/projects/list"
+        params = {"page": 1, "page_size": count}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        items=resp.get("items", [])
+        # logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
+        return status, items
+
+    def get_batch_list_data(self,count: int = 10):
+        """获取批次管理列表数据"""
+        url=self.kol_delivery_url+"/delivery/api/batches/list"
+        params = {"page": 1, "page_size": count}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        items=resp.get("items", [])
+        # logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
+        return status, items
+
+    def get_experimen_list_data(self,count: int = 10):
+        """获取实验管理列表数据"""
+        url=self.kol_delivery_url+"/delivery/api/experiments/list"
+        params = {"page": 1, "page_size": count}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+
+        items=resp.get("items", [])
+        logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
+        return status, items
+
+    def get_create_ad_video_list_data(self,experiment_code:str,platform:list[str],count: int = 10):
+        """
+        获取新建广告中的视频列表数据
+        :param experiment_code:     实验code
+        :param platform         媒体平台
+        """
+        url=self.kol_delivery_url+"/delivery/api/materials/list"
+        payload = {"experiment_code":experiment_code,"media_platform":platform,"page":1,"page_size":count}
+        status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
+        if not status:
+            return status, resp
+        logger.debug(json.dumps(resp, indent=2))
+
+
+
+
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
@@ -696,7 +748,7 @@ if __name__ == "__main__":
                               domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
 
-    # kolsys_api.query_kol_users()
+    kolsys_api.get_experimen_list_data()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
     # kolsys_api.get_jp_regions()
     # kolsys_api.get_jp_cities(43)

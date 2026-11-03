@@ -184,13 +184,28 @@ CASES = [
         "func": lambda api: api.query_settle_detail_list_data(count=10,tab_type=KolEnum.SettleTab.COMPLETED.value),
         "check": _check_list_has_data_by_none,
     },
+    {
+        "name": "投流管理--获取项目管理列表数据",
+        "func": lambda api: api.get_projects_list_data(count=10),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取批次管理列表数据",
+        "func": lambda api: api.get_batch_list_data(count=10),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取实验管理列表数据",
+        "func": lambda api: api.get_experimen_list_data(count=10),
+        "check": _check_list_has_data,
+    },
 ]
 
 
-def _build_robot_message(case_lines, passed, failed, total):
-    """组装机器人消息文本：环境 + 每个接口一行 + 巡检汇总（精简版）。"""
-    lines = [f"【达人基建平台--接口巡检】{_env_label()}"]
-    lines.extend(case_lines)
+def _build_robot_message(fail_lines, passed, failed, total):
+    """组装机器人告警文本：只在存在失败时调用，只列出失败接口（精简版）。"""
+    lines = [f"【达人基建平台--接口巡检告警】{_env_label()}"]
+    lines.extend(fail_lines)
     lines.append(f"巡检汇总：通过 {passed} / 失败 {failed} / 共 {total}")
     return "\n".join(lines)
 
@@ -257,7 +272,7 @@ def run_kol_activate_pro(only_name=None):
     passed = 0
     failed = 0
     total = len(cases)
-    robot_lines = []  # 机器人消息里每个接口的一行（精简版）
+    fail_lines = []  # 机器人告警消息里，仅收集「失败」接口的一行（精简版）
 
     # ── 完整日志（详细）──
     print("=" * 44)
@@ -270,25 +285,25 @@ def run_kol_activate_pro(only_name=None):
             ok, detail = case["check"](status, data)
         except Exception as e:  # noqa: BLE001 巡检兜底，单个接口异常不影响汇总
             ok, detail = False, f"执行异常：{e}"
-        # 运行消息统一收集到 result（最终体现在页面「成功消息/失败消息」），
-        # 同时作为机器人消息的精简版一行。
+        # 运行消息统一收集到 result（最终体现在页面「成功消息/失败消息」）。
         if ok:
             passed += 1
-            line = f"[{i}/{total}] {name}：✅ 通过（{detail}）"
-            result.add_success(line)
-            robot_lines.append(line)
+            result.add_success(f"[{i}/{total}] {name}：✅ 通过（{detail}）")
         else:
             failed += 1
             line = f"[{i}/{total}] {name}：❌ 失败（{detail}）"
             result.add_fail(line)
-            robot_lines.append(line)
+            fail_lines.append(line)
         print(f"  检查结果：{'✅ 通过' if ok else '❌ 失败'}（{detail}）")
     print("=" * 44)
     print(f"巡检汇总：通过 {passed} / 失败 {failed} / 共 {total}")
 
-    # ── 机器人消息（精简版，不含结果上报 JSON）──
-    robot_msg = _build_robot_message(robot_lines, passed, failed, total)
-    _send_robot_message(robot_msg)
+    # ── 机器人消息：仅在存在失败时发送告警（只列失败接口），全部通过则不打扰 ──
+    if failed:
+        robot_msg = _build_robot_message(fail_lines, passed, failed, total)
+        _send_robot_message(robot_msg)
+    else:
+        print("[机器人消息] 巡检全部通过，不发送告警")
 
     # ── 任务结果上报：下方 JSON 供定时任务系统解析（判断成功/失败），
     #    不是机器人消息，不会通过机器人发送 ──

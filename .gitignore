@@ -11,3 +11,12 @@ frontend/dist/
 .env
 logs/
 backend/config/page_config.json
+
+# 桌面工具源码目录（本地工具，不提 git）
+backend/tools/
+
+# 桌面工具打包产物（backend/tools/build.sh 生成）
+backend/build/
+backend/dist/
+backend/build_venv/
+backend/*.spec
