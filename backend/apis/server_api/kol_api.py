@@ -545,8 +545,8 @@ class KolsysApi(KolEnum):
         status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
         if not status:
             return status, resp
-        # logger.debug(json.dumps(resp,indent=2))
         approvals = resp.get("data", {}).get("approvals", [])
+        # logger.debug(json.dumps(approvals, indent=2))
         return status, approvals
 
     def query_order_reviews_list_data_by_pending(self, count: int = 10, **filters):
@@ -578,8 +578,8 @@ class KolsysApi(KolEnum):
         status, resp = my_get(url, headers=self.headers, params=params)
         if not status:
             return status, resp
-        items = resp.get("items", [])
-        # logger.debug(json.dumps(items))
+        # logger.debug(json.dumps(resp))
+        items = resp.get("items") or []
         return status, items
 
     def query_settle_detail_list_data(self, tab_type,count:int=10):
@@ -593,7 +593,7 @@ class KolsysApi(KolEnum):
         if not status:
             return status, resp
         items = resp.get("items", [])
-        # logger.debug(json.dumps(items))
+        logger.debug(json.dumps(items))
         return status, items
 
     def query_kolline_daren_email_list_data(self,count: int = 10):
@@ -695,7 +695,7 @@ if __name__ == "__main__":
     kolsys_api.get_user_token(user_email, is_set_cache=False,
                               domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
-    kolsys_api.query_settle_detail_list_data(tab_type=KolEnum.SettleTab.COMPLETED)
+
     # kolsys_api.query_kol_users()
     # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
     # kolsys_api.get_jp_regions()
