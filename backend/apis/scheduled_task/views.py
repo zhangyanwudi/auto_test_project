@@ -249,10 +249,30 @@ def task_delete(request, pk):
 @require_http_methods(['GET'])
 @require_valid_token
 def task_run_logs(request, pk):
-    """查询指定任务的执行日志列表（按执行时间倒序，最多返回 100 条）。"""
+    """查询指定任务的执行日志列表（按执行时间倒序）。
+
+    支持分页：传 page / page_size 时返回 { list, total }；
+    不传时保持旧行为，返回数组（最多 100 条），兼容旧前端。
+    """
     try:
         ZScheduledTask.objects.get(pk=pk)
     except ZScheduledTask.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '任务不存在'}, status=404)
-    qs = ZScheduledTaskRunLog.objects.filter(task_id=pk).order_by('-id')[:100]
-    return JsonResponse({'code': 0, 'data': [_serialize_run_log(rl) for rl in qs]})
+
+    qs = ZScheduledTaskRunLog.objects.filter(task_id=pk).order_by('-id')
+
+    page = request.GET.get('page')
+    page_size = request.GET.get('page_size')
+    if page is not None or page_size is not None:
+        try:
+            page = max(1, int(page or 1))
+            page_size = min(100, max(1, int(page_size or 10)))
+        except (TypeError, ValueError):
+            return JsonResponse({'code': 400, 'message': 'page/page_size 必须为整数'}, status=400)
+        total = qs.count()
+        offset = (page - 1) * page_size
+        items = [_serialize_run_log(rl) for rl in qs[offset:offset + page_size]]
+        return JsonResponse({'code': 0, 'data': {'list': items, 'total': total}})
+
+    items = [_serialize_run_log(rl) for rl in qs[:100]]
+    return JsonResponse({'code': 0, 'data': items})

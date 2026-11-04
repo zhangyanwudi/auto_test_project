@@ -248,33 +248,47 @@
       <!-- 列表视图 -->
       <div v-if="!runLogDetailView" v-loading="runLogsLoading">
         <el-empty v-if="!runLogsLoading && runLogs.length === 0" description="暂无执行记录" :image-size="72" />
-        <el-table v-else :data="runLogs" border stripe style="width: 100%">
-          <el-table-column prop="start_time" label="执行时间" min-width="170" show-overflow-tooltip />
-          <el-table-column label="触发方式" width="100">
-            <template #default="{ row }">
-              {{ row.trigger_type === 'cron' ? '定时调度' : '立即运行' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="执行时长" width="120">
-            <template #default="{ row }">
-              {{ formatDuration(row.duration_ms) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="结果" width="80">
-            <template #default="{ row }">
-              <el-tag :type="row.success ? 'success' : 'danger'" size="small">
-                {{ row.success ? '成功' : '失败' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="90" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="openRunLogDetail(row)">
-                详情
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <template v-else>
+          <el-table :data="runLogs" border stripe style="width: 100%">
+            <el-table-column prop="start_time" label="执行时间" min-width="170" show-overflow-tooltip />
+            <el-table-column label="触发方式" width="100">
+              <template #default="{ row }">
+                {{ row.trigger_type === 'cron' ? '定时调度' : '立即运行' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="执行时长" width="120">
+              <template #default="{ row }">
+                {{ formatDuration(row.duration_ms) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="结果" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.success ? 'success' : 'danger'" size="small">
+                  {{ row.success ? '成功' : '失败' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="90" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="openRunLogDetail(row)">
+                  详情
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="list-pagination">
+            <el-pagination
+              v-model:current-page="runLogsPage"
+              v-model:page-size="runLogsPageSize"
+              :page-sizes="runLogsPageSizes"
+              :total="runLogsTotal"
+              layout="total, sizes, prev, pager, next, jumper"
+              background
+              @size-change="onRunLogsPageSizeChange"
+              @current-change="onRunLogsPageChange"
+            />
+          </div>
+        </template>
       </div>
       <!-- 详情视图：复用结果弹窗的展示结构 -->
       <div v-else class="run-result-body">
@@ -288,24 +302,49 @@
           <span class="run-result-label">返回说明：</span>{{ runResultView.message || '—' }}
         </p>
         <template v-if="runResultView.metaText">
-          <p class="run-result-section-title">运行环境</p>
-          <pre class="run-result-pre">{{ runResultView.metaText }}</pre>
+          <p class="run-result-section-title">
+            运行环境
+            <el-button link type="primary" size="small" @click="toggleRunResultSection('meta')">
+              {{ runResultSections.meta ? '收起' : '展开' }}
+            </el-button>
+          </p>
+          <pre v-show="runResultSections.meta" class="run-result-pre">{{ runResultView.metaText }}</pre>
         </template>
         <template v-if="runResultView.successMsgs.length">
-          <p class="run-result-section-title">成功消息</p>
-          <pre class="run-result-pre">{{ runResultView.successMsgs.join('\n') }}</pre>
+          <p class="run-result-section-title">
+            成功消息（{{ countTextLines(runResultView.successMsgs.join('\n')) }} 行）
+            <el-button link type="primary" size="small" @click="toggleRunResultSection('successMsgs')">
+              {{ runResultSections.successMsgs ? '收起' : '展开' }}
+            </el-button>
+          </p>
+          <pre v-show="runResultSections.successMsgs" class="run-result-pre">{{ runResultView.successMsgs.join('\n') }}</pre>
         </template>
         <template v-if="runResultView.failMsgs.length">
-          <p class="run-result-section-title">失败消息</p>
-          <pre class="run-result-pre run-result-pre-err">{{ runResultView.failMsgs.join('\n') }}</pre>
+          <p class="run-result-section-title">
+            失败消息（{{ countTextLines(runResultView.failMsgs.join('\n')) }} 行）
+            <el-button link type="primary" size="small" @click="toggleRunResultSection('failMsgs')">
+              {{ runResultSections.failMsgs ? '收起' : '展开' }}
+            </el-button>
+          </p>
+          <pre v-show="runResultSections.failMsgs" class="run-result-pre run-result-pre-err">{{ runResultView.failMsgs.join('\n') }}</pre>
         </template>
         <template v-if="runResultView.stdout">
-          <p class="run-result-section-title">标准输出</p>
-          <pre class="run-result-pre">{{ runResultView.stdout }}</pre>
+          <p class="run-result-section-title">
+            标准输出（{{ countTextLines(runResultView.stdout) }} 行）
+            <el-button link type="primary" size="small" @click="toggleRunResultSection('stdout')">
+              {{ runResultSections.stdout ? '收起' : '展开' }}
+            </el-button>
+          </p>
+          <pre v-show="runResultSections.stdout" class="run-result-pre">{{ runResultView.stdout }}</pre>
         </template>
         <template v-if="runResultView.stderr">
-          <p class="run-result-section-title">标准错误</p>
-          <pre class="run-result-pre run-result-pre-err">{{ runResultView.stderr }}</pre>
+          <p class="run-result-section-title">
+            标准错误（{{ countTextLines(runResultView.stderr) }} 行）
+            <el-button link type="primary" size="small" @click="toggleRunResultSection('stderr')">
+              {{ runResultSections.stderr ? '收起' : '展开' }}
+            </el-button>
+          </p>
+          <pre v-show="runResultSections.stderr" class="run-result-pre run-result-pre-err">{{ runResultView.stderr }}</pre>
         </template>
       </div>
       <template #footer>
@@ -363,13 +402,27 @@ const runResultView = reactive({
   stdout: '',
   stderr: '',
 })
+/** 详情视图各 section 是否展开（默认折叠，避免大文本撑爆弹窗） */
+const runResultSections = reactive({
+  meta: false,
+  successMsgs: false,
+  failMsgs: false,
+  stdout: false,
+  stderr: false,
+})
 
 const runLogsVisible = ref(false)
 const runLogsLoading = ref(false)
 const runLogs = ref([])
 const runLogsTaskName = ref('')
+const runLogsTaskId = ref(null)
 /** 日志弹窗当前是否处于「详情」视图（false-列表视图） */
 const runLogDetailView = ref(false)
+/** 日志分页 */
+const runLogsPage = ref(1)
+const runLogsPageSize = ref(10)
+const runLogsTotal = ref(0)
+const runLogsPageSizes = [10, 20, 50, 100]
 
 const showEmptyHint = computed(() => !loading.value && list.value.length === 0)
 
@@ -728,6 +781,17 @@ function fillRunResultView(row, runResult) {
   runResultView.failMsgs = _asMsgList(d.fail_msgs)
   runResultView.stdout = String(d.stdout || '').trim()
   runResultView.stderr = String(d.stderr || '').trim()
+  // 每次切换到详情视图，重置各 section 为折叠
+  Object.keys(runResultSections).forEach((k) => { runResultSections[k] = false })
+}
+
+function toggleRunResultSection(key) {
+  runResultSections[key] = !runResultSections[key]
+}
+
+function countTextLines(text) {
+  if (!text) return 0
+  return String(text).split('\n').length
 }
 
 function formatDuration(durationMs) {
@@ -740,25 +804,54 @@ function formatDuration(durationMs) {
   return `${minutes}m${remain}s`
 }
 
-async function openRunLogsDialog(row) {
-  runLogsTaskName.value = row.task_name || ''
-  runLogDetailView.value = false
-  runLogsVisible.value = true
+async function loadRunLogs() {
   runLogsLoading.value = true
   try {
-    const res = await fetchTaskRunLogs(row.id)
-    runLogs.value = res.code === 0 && Array.isArray(res.data) ? res.data : []
+    const res = await fetchTaskRunLogs(runLogsTaskId.value, {
+      page: runLogsPage.value,
+      page_size: runLogsPageSize.value,
+    })
+    if (res.code === 0 && res.data && typeof res.data === 'object' && Array.isArray(res.data.list)) {
+      runLogs.value = res.data.list
+      runLogsTotal.value = res.data.total || 0
+    } else {
+      runLogs.value = []
+      runLogsTotal.value = 0
+    }
   } catch {
     runLogs.value = []
+    runLogsTotal.value = 0
   } finally {
     runLogsLoading.value = false
   }
 }
 
+async function openRunLogsDialog(row) {
+  runLogsTaskName.value = row.task_name || ''
+  runLogsTaskId.value = row.id
+  runLogDetailView.value = false
+  runLogsPage.value = 1
+  runLogsVisible.value = true
+  await loadRunLogs()
+}
+
+function onRunLogsPageChange() {
+  loadRunLogs()
+}
+
+function onRunLogsPageSizeChange() {
+  runLogsPage.value = 1
+  loadRunLogs()
+}
+
 function onRunLogsDialogClosed() {
   runLogs.value = []
   runLogsTaskName.value = ''
+  runLogsTaskId.value = null
   runLogDetailView.value = false
+  runLogsPage.value = 1
+  runLogsPageSize.value = 10
+  runLogsTotal.value = 0
 }
 
 function openRunLogDetail(runLog) {
@@ -1043,16 +1136,24 @@ onMounted(() => {
 }
 
 .run-result-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--el-text-color-secondary);
 }
 
+.run-result-body {
+  max-height: 60vh;
+  overflow: auto;
+}
+
 .run-result-pre {
   margin: 0 0 14px;
   padding: 10px 12px;
-  max-height: 240px;
+  max-height: 300px;
   overflow: auto;
   font-size: 12px;
   line-height: 1.5;
@@ -1065,5 +1166,11 @@ onMounted(() => {
 
 .run-result-pre-err {
   color: var(--el-color-danger);
+}
+
+.list-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
 }
 </style>

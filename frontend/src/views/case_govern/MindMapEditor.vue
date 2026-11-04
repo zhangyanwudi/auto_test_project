@@ -152,7 +152,7 @@
         </el-radio-group>
       </div>
       <template #footer>
-        <el-button @click="conflictDialogVisible = false">取消</el-button>
+        <el-button @click="cancelConflictResolve">取消</el-button>
         <el-button type="primary" @click="confirmConflictResolve">确认合并并保存</el-button>
       </template>
     </el-dialog>
@@ -748,9 +748,12 @@ async function onSave(silent = false) {
   await saveChain
 }
 
-async function doSave(silent = false) {
+async function doSave(silent = false, baseVersion) {
+  // baseVersion：本次提交用的乐观锁版本号；缺省用全局 version.value。
+  // 合并重存时须显式传入「服务器最新 version」，否则仍带旧 version 会再次 409。
+  const submitVersion = baseVersion != null ? baseVersion : version.value
   try {
-    const res = await saveMindTree(props.caseId, serializeNode(tree), version.value)
+    const res = await saveMindTree(props.caseId, serializeNode(tree), submitVersion)
     if (res.code === 0) {
       // 保存成功后更新本地乐观锁版本号（后端返回了最新 version）
       if (res.data && res.data.version) {
@@ -764,12 +767,11 @@ async function doSave(silent = false) {
       emit('dirty-change', false)
       emit('saved')
     } else if (res.code === 409) {
-      // 乐观锁冲突：先同步服务器返回的最新 version，再三方合并。
-      // 否则 handleMergeConflict 里重新保存时仍带旧 base_version，会再次 409，形成死循环。
-      if (res.data && res.data.version) {
-        version.value = res.data.version
-      }
-      await handleMergeConflict(res)
+      // 乐观锁冲突：用局部变量承接服务器最新 version，不立即污染全局 version.value。
+      // 若这里直接改全局 version，用户取消合并后全局 version 已是最新，而树仍是旧内容，
+      // 下次保存会绕过乐观锁校验，直接覆盖掉其它页签/用户的修改。
+      const latestVersion = (res.data && res.data.version) || ''
+      await handleMergeConflict(res, latestVersion)
     } else {
       ElMessage.error(res.message || '保存失败')
     }
@@ -779,7 +781,7 @@ async function doSave(silent = false) {
 }
 
 /** 处理保存冲突：三方合并，冲突节点弹列表让用户逐条选择 */
-async function handleMergeConflict(res) {
+async function handleMergeConflict(res, latestVersion = '') {
   const serverTree = res.data?.server_tree
   if (!serverTree) {
     // 后端没返回 server 树（异常），退化为简单提示
@@ -798,17 +800,18 @@ async function handleMergeConflict(res) {
     applyTreeToLocal(mergedTree)
     // 当前已在保存队列内部（doSave 调用链上），直接串行重存；
     // 若再走 onSave 入队会 await 到包含当前任务的 saveChain，导致自等待死锁。
-    await doSave(true)
+    // 用服务器最新 version 重存，避免再次 409。
+    await doSave(true, latestVersion)
     return
   }
 
-  // 有冲突：弹冲突列表
+  // 有冲突：弹冲突列表（把最新 version 暂存，确认合并后用它重存）
   conflictList.value = conflicts.map((c) => ({
     ...c,
     choice: 'mine', // 默认保留 mine（B 自己的）
   }))
   conflictDialogVisible.value = true
-  conflictPendingSave.value = { mergedTree }
+  conflictPendingSave.value = { mergedTree, latestVersion }
 }
 
 /** 把合并后的树应用回本地响应式 tree */
@@ -827,10 +830,17 @@ function applyTreeToLocal(node, target = tree) {
   })
 }
 
+/** 取消冲突合并：放弃本次合并，清空待保存状态（不更新 version，保留用户本地修改） */
+function cancelConflictResolve() {
+  conflictDialogVisible.value = false
+  conflictPendingSave.value = null
+  conflictList.value = []
+}
+
 /** 冲突列表确认：把用户选择应用到合并树，再重新保存 */
 async function confirmConflictResolve() {
   if (!conflictPendingSave.value) return
-  const { mergedTree } = conflictPendingSave.value
+  const { mergedTree, latestVersion } = conflictPendingSave.value
 
   // 根据用户在冲突列表中的选择，替换合并树里对应节点内容
   const replaceNodeById = (node, id, chosenNode) => {
@@ -867,7 +877,7 @@ async function confirmConflictResolve() {
   conflictPendingSave.value = null
 
   // 用最新 version 重新保存（与 handleMergeConflict 无冲突分支一致，直接串行重存）
-  await doSave()
+  await doSave(false, latestVersion)
 }
 
 function onBack() {

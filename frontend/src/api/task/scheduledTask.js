@@ -59,7 +59,11 @@ export async function deleteScheduledTask(id) {
   return res.json()
 }
 
-export async function fetchTaskRunLogs(id) {
-  const res = await requestWithToken(`${BASE}/tasks/${id}/logs/`)
+export async function fetchTaskRunLogs(id, params) {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.page_size) qs.set('page_size', String(params.page_size))
+  const query = qs.toString()
+  const res = await requestWithToken(`${BASE}/tasks/${id}/logs/${query ? `?${query}` : ''}`)
   return res.json()
 }
