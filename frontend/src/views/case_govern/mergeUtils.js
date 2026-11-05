@@ -14,20 +14,12 @@
  * - 新增/删除按 id 判断，单向新增/删除不算冲突；双向冲突才记录
  *
  * 返回 { mergedTree, conflicts }，conflicts 元素：
- *   { id, title, serverTitle, mineTitle, serverNode, mineNode }
+ *   { id, title, serverTitle, mineTitle, serverNode, mineNode, action }
  */
 
 function nodeKey(id) {
   // 新节点 id 可能是字符串临时 id（n_xxx）或 null，统一映射
   return id == null ? null : String(id)
-}
-
-function buildIdMap(tree, map = new Map()) {
-  map.set(nodeKey(tree.id), tree)
-  for (const ch of tree.children || []) {
-    buildIdMap(ch, map)
-  }
-  return map
 }
 
 function fieldsEqual(a, b) {
@@ -54,102 +46,84 @@ function cloneNode(n) {
 
 export function mergeTrees(base, server, mine) {
   const conflicts = []
-  const baseMap = buildIdMap(base)
-  const serverMap = buildIdMap(server)
-  const mineMap = buildIdMap(mine)
 
-  // 收集所有节点 id（含新建临时 id）
-  const allKeys = new Set([...baseMap.keys(), ...serverMap.keys(), ...mineMap.keys()])
+  /**
+   * 合并单个节点的字段（不含 children），返回 { node, conflict }。
+   * 前提：该节点在 base/server/mine 三边中至少存在，且不是「仅一边存在」的增删情况
+   * （增删在 mergeNode 的存在性分支里已处理）。
+   */
+  function mergeNodeContent(b, s, m, key) {
+    const title = (m && m.title) || (s && s.title) || (b && b.title) || ''
+    const node = cloneNode(s || m || b || { title })
+    node.id = (m && m.id != null) ? m.id : ((s && s.id != null) ? s.id : (b && b.id != null ? b.id : null))
 
-  function mergeNode(id, parentBaseKey, parentServerKey, parentMineKey) {
-    const key = id == null ? null : nodeKey(id)
-    const b = baseMap.get(key)
-    const s = serverMap.get(key)
-    const m = mineMap.get(key)
-
-    // 节点只存在于某一边
-    if (!s && !m) return null
-    if (!s && m) {
-      // 只有 mine 有（B 新增）→ 保留 mine
-      const out = cloneNode(m)
-      for (const ch of m.children || []) {
-        const mergedChild = mergeNode(ch.id, key, null, key)
-        if (mergedChild) out.children.push(mergedChild)
-      }
-      return out
-    }
-    if (s && !m) {
-      // 只有 server 有（A 新增，B 没这个节点，但 B 未删除）→ 用 server
-      // 注意：若 B 删除了该节点（mine 无），说明 A、B 一边新增一边删除，这里是 server 有 mine 无，
-      // 而 base 也可能有/无。若 base 有而 mine 无 → B 删除了，A 没改 → 跟 A 保留？需判断。
-      // 简化处理：base 无（A 新增）+ mine 无 → 保留 server；base 有 + mine 无 → B 删除，A 未改则跟随删除，A 改了则冲突。
-      const bHas = baseMap.has(key)
-      if (!bHas) {
-        // A 新增的节点，B 没见过 → 保留 server
-        const out = cloneNode(s)
-        for (const ch of s.children || []) {
-          const mergedChild = mergeNode(ch.id, null, key, null)
-          if (mergedChild) out.children.push(mergedChild)
-        }
-        return out
-      }
-      // base 有，mine 无 → B 删除了
-      if (fieldsEqual(b, s)) {
-        // A 没改该节点，跟随 B 删除
-        return null
-      }
-      // A 改了、B 删了 → 冲突
-      conflicts.push({
-        id: key,
-        title: (m && m.title) || (b && b.title) || '',
-        serverTitle: (s && s.title) || '',
-        mineTitle: '(已删除)',
-        serverNode: cloneNode(s),
-        mineNode: null,
-        action: 'delete',
-      })
-      // 默认保留 mine（删除），用户在冲突列表可改
-      return null
+    // 只有 server 存在（A 新增）或只有 mine 存在（B 新增）时，不存在「两边都改」的冲突
+    if (!s || !m) {
+      node.title = title
+      node.node_type = (m && m.node_type) || (s && s.node_type) || 'case'
+      node.is_smoke = !!(m ? m.is_smoke : s.is_smoke)
+      node.exec_result = (m ? m.exec_result : s.exec_result) || ''
+      node.collapsed = !!(m ? m.collapsed : s.collapsed)
+      node.image = (m ? m.image : s.image) || ''
+      return { node, conflict: null }
     }
 
-    // 两边都有
-    // 关键修复：b（base）可能为 undefined —— B 新增的节点（mine 有、base 无），
-    // 此时该节点 A 不可能改过，直接保留 mine（B 的），避免访问 b.title 报错。
+    // b 可能为 undefined：当该节点是双方都「新增」的同 id 节点（理论上不会发生，
+    // 因为 id 全局唯一；但 null id 新节点可能出现，此时 b 无，直接保留 mine）。
     if (!b) {
-      const out = cloneNode(m)
-      mergeChildren(out, s, m, key)
-      return out
+      node.title = m.title || s.title || ''
+      node.node_type = m.node_type || 'case'
+      node.is_smoke = !!m.is_smoke
+      node.exec_result = m.exec_result || ''
+      node.collapsed = !!m.collapsed
+      node.image = m.image || ''
+      return { node, conflict: null }
     }
+
     const serverChanged = !fieldsEqual(b, s)
     const mineChanged = !fieldsEqual(b, m)
     const serverMineSame = fieldsEqual(s, m)
 
     if (!serverChanged && !mineChanged) {
-      // 都没改，或改动一致
-      const out = cloneNode(s)
-      mergeChildren(out, s, m, key)
-      return out
+      node.title = s.title || ''
+      node.node_type = s.node_type || 'case'
+      node.is_smoke = !!s.is_smoke
+      node.exec_result = s.exec_result || ''
+      node.collapsed = !!s.collapsed
+      node.image = s.image || ''
+      return { node, conflict: null }
     }
     if (serverChanged && !mineChanged) {
-      // 只有 A 改 → 用 server
-      const out = cloneNode(s)
-      mergeChildren(out, s, m, key)
-      return out
+      node.title = s.title || ''
+      node.node_type = s.node_type || 'case'
+      node.is_smoke = !!s.is_smoke
+      node.exec_result = s.exec_result || ''
+      node.collapsed = !!s.collapsed
+      node.image = s.image || ''
+      return { node, conflict: null }
     }
     if (!serverChanged && mineChanged) {
-      // 只有 B 改 → 用 mine
-      const out = cloneNode(m)
-      mergeChildren(out, s, m, key)
-      return out
+      node.title = m.title || ''
+      node.node_type = m.node_type || 'case'
+      node.is_smoke = !!m.is_smoke
+      node.exec_result = m.exec_result || ''
+      node.collapsed = !!m.collapsed
+      node.image = m.image || ''
+      return { node, conflict: null }
     }
-    // 两边都改了，且内容不同 → 冲突
+
+    // 两边都改了且内容不同 → 冲突
     if (serverMineSame) {
-      // 改成了相同内容（如都改成了同一句话）→ 无冲突
-      const out = cloneNode(s)
-      mergeChildren(out, s, m, key)
-      return out
+      node.title = s.title || ''
+      node.node_type = s.node_type || 'case'
+      node.is_smoke = !!s.is_smoke
+      node.exec_result = s.exec_result || ''
+      node.collapsed = !!s.collapsed
+      node.image = s.image || ''
+      return { node, conflict: null }
     }
-    conflicts.push({
+
+    const conflict = {
       id: key,
       title: (b && b.title) || (m && m.title) || (s && s.title) || '',
       serverTitle: (s && s.title) || '',
@@ -157,39 +131,150 @@ export function mergeTrees(base, server, mine) {
       serverNode: cloneNode(s),
       mineNode: cloneNode(m),
       action: 'edit',
-    })
+    }
     // 默认保留 mine（B 的），用户可在冲突列表调整
-    const out = cloneNode(m)
-    mergeChildren(out, s, m, key)
-    return out
+    node.title = m.title || ''
+    node.node_type = m.node_type || 'case'
+    node.is_smoke = !!m.is_smoke
+    node.exec_result = m.exec_result || ''
+    node.collapsed = !!m.collapsed
+    node.image = m.image || ''
+    return { node, conflict }
   }
 
-  function mergeChildren(outNode, s, m, key) {
-    // 子节点顺序：以 server 为基准，附加 mine 中新增的子节点
-    const sChildren = (s && s.children) || []
-    const mChildren = (m && m.children) || []
+  /**
+   * 判断节点 id 是否为「数据库数字 id」（含数字字符串）。
+   * 非数字（null / 临时 id n_xxx）视为「新节点」，合并时独立保留、不按 id 匹配。
+   */
+  function isNumericId(id) {
+    if (id == null) return false
+    return /^\d+$/.test(String(id))
+  }
+
+  /**
+   * 合并子节点列表（按父节点上下文，避免跨父节点串位）。
+   * 返回合并后的子节点数组。
+   *
+   * 关键：数字 id 节点按 id 精确匹配；非数字 id（null）的新节点各自独立保留，
+   * 绝不放进 Map 用 null 作 key（否则同父节点下多个新节点会互相覆盖丢失）。
+   */
+  function mergeChildrenList(baseChildren, serverChildren, mineChildren) {
+    const bList = baseChildren || []
+    const sList = serverChildren || []
+    const mList = mineChildren || []
     const merged = []
-    const sKeys = sChildren.map((c) => nodeKey(c.id))
-    const mKeys = mChildren.map((c) => nodeKey(c.id))
 
-    // 先按 server 顺序合并
-    for (const sc of sChildren) {
-      const mc = mChildren.find((c) => nodeKey(c.id) === nodeKey(sc.id))
-      const bc = null
-      const mergedChild = mergeNode(sc.id, key, key, key)
-      if (mergedChild) merged.push(mergedChild)
+    // 数字 id 节点按 id 建索引（只索引数据库已有节点）
+    const bById = new Map()
+    bList.forEach((c) => { if (isNumericId(c.id)) bById.set(nodeKey(c.id), c) })
+    const sById = new Map()
+    sList.forEach((c) => { if (isNumericId(c.id)) sById.set(nodeKey(c.id), c) })
+    const mById = new Map()
+    mList.forEach((c) => { if (isNumericId(c.id)) mById.set(nodeKey(c.id), c) })
+
+    // 新节点（null 或临时 id）按出现顺序收集，独立合并
+    const sNew = sList.filter((c) => !isNumericId(c.id))
+    const mNew = mList.filter((c) => !isNumericId(c.id))
+
+    // 1) 先合并「数字 id」节点（按 id 匹配，含 base 三态判断）
+    const allNumericKeys = new Set([...bById.keys(), ...sById.keys(), ...mById.keys()])
+    const handled = new Set()
+    for (const key of allNumericKeys) {
+      if (handled.has(key)) continue
+      const b = bById.get(key)
+      const s = sById.get(key)
+      const m = mById.get(key)
+      const child = mergeNode(b, s, m, key)
+      if (child) merged.push(child)
+      handled.add(key)
     }
-    // 再补 mine 中 server 没有的新增子节点
-    for (const mc of mChildren) {
-      if (!sKeys.includes(nodeKey(mc.id))) {
-        const mergedChild = mergeNode(mc.id, key, key, key)
-        if (mergedChild) merged.push(mergedChild)
-      }
+
+    // 2) 再合并「新节点」：server 的新节点（A 新增）与 mine 的新节点（B 新增）
+    //    各自独立保留，不互相配对、不串位。
+    for (const sNode of sNew) {
+      const child = mergeNode(undefined, sNode, undefined, nodeKey(sNode.id))
+      if (child) merged.push(child)
     }
-    outNode.children = merged
+    for (const mNode of mNew) {
+      const child = mergeNode(undefined, undefined, mNode, nodeKey(mNode.id))
+      if (child) merged.push(child)
+    }
+
+    return merged
   }
 
-  const root = mergeNode(mine.id != null ? mine.id : (server.id != null ? server.id : base.id), null, null, null)
+  /**
+   * 合并单个节点（含存在性判断 + 字段合并 + 子节点递归）。
+   * 返回合并后的节点（可含 children），或 null（该节点应被删除）。
+   */
+  function mergeNode(b, s, m, key) {
+    // 三边都不存在 → 删除
+    if (!s && !m) return null
+
+    // server 无、mine 有
+    if (!s && m) {
+      if (b) {
+        // base 有 → 该节点被 A 删除，B 侧还有
+        if (fieldsEqual(b, m)) {
+          // B 没改该节点 → 尊重 A 的删除
+          return null
+        }
+        // A 删除了、B 又改了 → 冲突（默认保留 mine，让用户决定）
+        conflicts.push({
+          id: key,
+          title: (m && m.title) || (b && b.title) || '',
+          serverTitle: '(已删除)',
+          mineTitle: (m && m.title) || '',
+          serverNode: null,
+          mineNode: cloneNode(m),
+          action: 'delete',
+        })
+        const out = cloneNode(m)
+        out.children = mergeChildrenList([], [], m.children)
+        return out
+      }
+      // base 无 → B 新增 → 保留 mine
+      const out = cloneNode(m)
+      out.children = mergeChildrenList([], [], m.children)
+      return out
+    }
+
+    // server 有、mine 无
+    if (s && !m) {
+      if (b) {
+        // base 有 → 该节点被 B 删除，A 侧还有
+        if (fieldsEqual(b, s)) {
+          // A 没改该节点 → 尊重 B 的删除
+          return null
+        }
+        // B 删除了、A 又改了 → 冲突（默认保留 mine=删除，让用户决定）
+        conflicts.push({
+          id: key,
+          title: (b && b.title) || (s && s.title) || '',
+          serverTitle: (s && s.title) || '',
+          mineTitle: '(已删除)',
+          serverNode: cloneNode(s),
+          mineNode: null,
+          action: 'delete',
+        })
+        return null
+      }
+      // base 无 → A 新增 → 保留 server
+      const out = cloneNode(s)
+      out.children = mergeChildrenList([], s.children, [])
+      return out
+    }
+
+    // 两边都有 → 合并字段 + 递归子节点
+    const { node, conflict } = mergeNodeContent(b, s, m, key)
+    if (conflict) conflicts.push(conflict)
+    node.children = mergeChildrenList(b ? b.children : [], s.children, m.children)
+    return node
+  }
+
+  // 根节点：三边根节点视为同一节点（id 可能都为 null），直接合并
+  const rootKey = nodeKey(mine.id != null ? mine.id : (server.id != null ? server.id : base.id))
+  const root = mergeNode(base, server, mine, rootKey)
   const finalRoot = root || cloneNode(server || mine || base || { title: '', children: [] })
   return { mergedTree: finalRoot, conflicts }
 }

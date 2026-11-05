@@ -1,8 +1,10 @@
 import json
 import logging
 import re
+from datetime import timedelta
 
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -245,12 +247,17 @@ def task_delete(request, pk):
     return JsonResponse({'code': 0, 'message': '已删除'})
 
 
+# 执行日志页面仅展示近 N 天（更早的日志仍在数据库中保留，只是不再下发到页面）
+LOG_RETENTION_DAYS = 10
+
+
 @csrf_exempt
 @require_http_methods(['GET'])
 @require_valid_token
 def task_run_logs(request, pk):
     """查询指定任务的执行日志列表（按执行时间倒序）。
 
+    仅返回近 LOG_RETENTION_DAYS 天的日志；更早的日志保留在数据库，不在页面展示。
     支持分页：传 page / page_size 时返回 { list, total }；
     不传时保持旧行为，返回数组（最多 100 条），兼容旧前端。
     """
@@ -259,7 +266,9 @@ def task_run_logs(request, pk):
     except ZScheduledTask.DoesNotExist:
         return JsonResponse({'code': 404, 'message': '任务不存在'}, status=404)
 
-    qs = ZScheduledTaskRunLog.objects.filter(task_id=pk).order_by('-id')
+    # 只取近 10 天的日志（按执行开始时间 start_time 过滤）
+    cutoff = timezone.now() - timedelta(days=LOG_RETENTION_DAYS)
+    qs = ZScheduledTaskRunLog.objects.filter(task_id=pk, start_time__gte=cutoff).order_by('-id')
 
     page = request.GET.get('page')
     page_size = request.GET.get('page_size')
