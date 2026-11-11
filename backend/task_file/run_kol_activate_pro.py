@@ -26,7 +26,7 @@ from contextlib import redirect_stdout
 
 from apis.server_api.kol_api import KolsysApi,KolEnum
 from base_utils.task_result_base import TaskResultBuilder
-from base_utils.logger_base import logger
+from base_utils.logger_base import setting_logger
 
 
 
@@ -34,31 +34,47 @@ from base_utils.logger_base import logger
 KOL_USER_EMAIL = "zhangyan02195@hungrystudio.com"
 IS_DEBUG = False  # 默认正式环境；手动调试请用命令行 `python ... --debug` 切测试环境，不要改这一行！
 
+logger = setting_logger(__name__)
 
 def _env_label():
     """环境标识（延迟到运行时计算，入口处改了 IS_DEBUG 后仍能正确反映）。"""
     return "测试环境" if IS_DEBUG else "正式环境"
 
 
-def _check_list_has_data(status, data):
-    """检查「返回列表且有数据」：status 为真且 data 为非空列表。"""
+def _check_list_data_base(status, data):
+    """公共校验：status 为真且 data 为非空 list 或 dict；返回 (是否通过, 说明)。"""
     if status is not True:
         return False, f"接口调用失败：{data}"
-    if not isinstance(data, list):
+    if not isinstance(data, (list, dict)):
         return False, f"返回数据类型异常：{type(data).__name__}"
+    return True, ""
+
+
+def _format_data_count(data):
+    """格式化数据条数说明：dict 显示字段数，list 显示条数。"""
+    if isinstance(data, dict):
+        return f"返回数据 {len(data)} 个字段"
+    return f"返回数据 {len(data)} 条"
+
+
+def _check_list_has_data(status, data):
+    """检查「返回 list/dict 且有数据」：status 为真且 data 为非空 list 或 dict。"""
+    ok, msg = _check_list_data_base(status, data)
+    if not ok:
+        return False, msg
     if not data:
-        return False, "接口成功但未返回数据（空列表）"
-    return True, f"返回数据 {len(data)} 条"
+        return False, "接口成功但未返回数据（空数据）"
+    return True, _format_data_count(data)
+
 
 def _check_list_has_data_by_none(status, data):
-    """检查「返回列表且有数据」：status 为真且 data 为非空列表。"""
-    if status is not True:
-        return False, f"接口调用失败：{data}"
-    if not isinstance(data, list):
-        return False, f"返回数据类型异常：{type(data).__name__}"
+    """检查「返回 list/dict」：status 为真且 data 为 list 或 dict；空数据也算通过。"""
+    ok, msg = _check_list_data_base(status, data)
+    if not ok:
+        return False, msg
     if not data:
-        return True, "接口成功但未返回数据（空列表）"
-    return True, f"返回数据 {len(data)} 条"
+        return True, "接口成功但未返回数据（空数据）"
+    return True, _format_data_count(data)
 
 
 # ── 巡检项列表 ──────────────────────────────────────────────
@@ -199,6 +215,61 @@ CASES = [
         "func": lambda api: api.get_experimen_list_data(count=10),
         "check": _check_list_has_data,
     },
+    {
+        "name": "投流管理--添加广告获取视频列表",
+        "func": lambda api: api.get_create_ad_video_list_data(count=10),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--查看项目详情",
+        "func": lambda api: api.business_get_projects_detail(),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--查看批次详情",
+        "func": lambda api: api.business_get_batch_detail(),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--查看批次详情",
+        "func": lambda api: api.business_get_batch_detail(),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--查看实验详情",
+        "func": lambda api: api.business_get_experimen_detail(),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取配置--国家",
+        "func": lambda api: api.get_adplatform_api_configs_list_data(type='country'),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取配置--媒体平台",
+        "func": lambda api: api.get_adplatform_api_configs_list_data(type='media_platform'),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取配置--实验级别",
+        "func": lambda api: api.get_adplatform_api_configs_list_data(type='experiment_level'),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取配置--投放状态",
+        "func": lambda api: api.get_adplatform_api_configs_list_data(type='delivery_status'),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取配置--实验分类",
+        "func": lambda api: api.get_adplatform_api_configs_list_data(type='experiment_category'),
+        "check": _check_list_has_data,
+    },
+    {
+        "name": "投流管理--获取配置--创建状态",
+        "func": lambda api: api.get_adplatform_api_configs_list_data(type='submit_status'),
+        "check": _check_list_has_data,
+    },
 ]
 
 
@@ -275,13 +346,13 @@ def run_kol_activate_pro(only_name=None):
     fail_lines = []  # 机器人告警消息里，仅收集「失败」接口的一行（精简版）
 
     # ── 完整日志（详细）──
-    print("=" * 44)
+    logger.info("=" * 44)
     for i, case in enumerate(cases, start=1):
         name = case["name"]
-        print(f"[{i}/{total}] 接口名称：{name}")
+        logger.info(f"[{i}/{total}] 接口名称：{name}")
         try:
             status, data = case["func"](api)
-            # logger.info(json.dumps(data))
+            logger.info(json.dumps(data))
             ok, detail = case["check"](status, data)
         except Exception as e:  # noqa: BLE001 巡检兜底，单个接口异常不影响汇总
             ok, detail = False, f"执行异常：{e}"

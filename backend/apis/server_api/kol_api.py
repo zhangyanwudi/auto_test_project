@@ -7,6 +7,7 @@ from base_utils.time_base import get_before_date
 from base_utils.api_base import my_get, my_post
 from base_utils.logger_base import logger
 from enum import Enum, IntEnum
+from base_utils.persist_base import PersistBase
 
 
 @dataclass
@@ -35,7 +36,7 @@ class KolEnum:
         KOL_TEST = "https://marketing-test.youxi123.com"
         KOL_DEV1 = "https://marketing-dev1.youxi123.com"
         MI_TEST = "https://mi-test.youxi123.com"
-        KOL_PRO="https://marketing.youxi123.com"
+        KOL_PRO = "https://marketing.youxi123.com"
 
     class KeyWordType(str, Enum):
         """
@@ -62,13 +63,14 @@ class KolEnum:
 
     class Platform(str, Enum):
         """线索-平台"""
-        YouTuBe="youtube"
-        TikTok="TikTok"
-        VkVideo="vkvideo"
+        YouTuBe = "youtube"
+        TikTok = "TikTok"
+        VkVideo = "vkvideo"
 
     class Country(str, Enum):
         """国家"""
-        RU='RU'
+        RU = 'RU'
+
 
 class KolsysApi(KolEnum):
     # 用户邮箱
@@ -76,24 +78,24 @@ class KolsysApi(KolEnum):
                  is_debug: bool = False
                  ):
         self.is_debug = is_debug
+        # 初始化缓存
+        self._share = PersistBase(memory_only=True)
         # 默认测试环境
         self.default_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaXAiOiIzOS45Ni4yMjIuMjUiLCJjcmVhdGVkX2F0IjoxNzg3MTMxOTg1LCJlbWFpbCI6InpoYW5neWFuMDIxOTVAaHVuZ3J5c3R1ZGlvLmNvbSIsImZ1bGxfbmFtZSI6IuW8oOWyqSIsInVzZXJfaWQiOiI2YTg1NzI0NzNlNmJjMjAxNTdjOTJhZmIiLCJ1c2VybmFtZSI6InpoYW5neWFuMDIxOTUiLCJ3b3JrY29kZSI6IjAwMTIxNyJ9.R7byMV8nOdJTt8gaWbsx5zf_eMXU1Q_f_TVNarrCqG0"
-        self.mi_url = "https://iam-test.youxi123.com"       # mi平台-测试
-        self.kol_url = "https://marketing-test.youxi123.com"    # 达人基建平台-测试
-        self.kolline_url = "https://kollink-test.afafb.com"     # 建联-测试
-        self.kol_delivery_url = "https://delivery-test.youxi123.com"    # 投流-测试
+        self.mi_url = "https://iam-test.youxi123.com"  # mi平台-测试
+        self.kol_url = "https://marketing-test.youxi123.com"  # 达人基建平台-测试
+        self.kolline_url = "https://kollink-test.afafb.com"  # 建联-测试
+        self.kol_delivery_url = "https://delivery-test.youxi123.com"  # 投流-测试
         self.kol_leadhub_url = "https://kol-leadhub-stage.afafb.com"  # 线索库-测试
         if not self.is_debug:
             self.default_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaXAiOiIzOS4xNTUuMTcyLjM0IiwiY3JlYXRlZF9hdCI6MTc4OTkwNjA2NiwiZW1haWwiOiJ6aGFuZ3lhbjAyMTk1QGh1bmdyeXN0dWRpby5jb20iLCJmdWxsX25hbWUiOiLlvKDlsqkiLCJpc3MiOiJpYW0tbWkueW91eGkxMjMuY29tIiwidXNlcl9pZCI6IjZhODU3NGVhNWI1NTI4NjdkNGU1OGRhZCIsInVzZXJuYW1lIjoiemhhbmd5YW4wMjE5NSIsIndvcmtjb2RlIjoiMDAxMjE3In0.JUxuozq_6x2n4ZqytczLIhZmctGzmqEnfIBrzwNcFRY"
-            self.mi_url = "https://iam-mi.youxi123.com"     # mi平台-正式
-            self.kol_url = "https://marketing.youxi123.com"     # 达人基建平台-正式
-            self.kolline_url = "https://kol-link.youxi123.com"      # 建联-正式
+            self.mi_url = "https://iam-mi.youxi123.com"  # mi平台-正式
+            self.kol_url = "https://marketing.youxi123.com"  # 达人基建平台-正式
+            self.kolline_url = "https://kol-link.youxi123.com"  # 建联-正式
             self.kol_delivery_url = "https://delivery-mi.youxi123.com"  # 投流-正式
             self.kol_leadhub_url = "https://kol-leadhub-prod.afafb.com"  # 线索库-正式
 
         self.headers = {"Authorization": f"Bearer {self.default_token}"}
-        # 公共参数
-        self.user_name=""
 
     def _update_headers(self):
         """更新headers"""
@@ -116,7 +118,7 @@ class KolsysApi(KolEnum):
         params = {"email": user_email}
         logger.info(f"获取用户 token，email=【{user_email}】")
         status, resp = my_get(url, headers=self.headers, params=params)
-        logger.info(resp)
+        # logger.info(resp)
         if not status:
             return status, resp
         #
@@ -126,7 +128,8 @@ class KolsysApi(KolEnum):
         data = resp.get("data")
         # 更新token
         self.default_token = data.get("token")
-        self.user_name =data.get("user",{}).get("username","")
+        user_name = data.get("user", {}).get("username", "")
+        self._share.put_only("user_name", user_name)
         self._update_headers()
         # 输出用户信息
         info = TokenInfo(
@@ -571,7 +574,7 @@ class KolsysApi(KolEnum):
         approvals = resp.get("data", {}).get("approvals", [])
         return status, approvals
 
-    def query_video_reviews_list_data(self, tab_type,count:int=10):
+    def query_video_reviews_list_data(self, tab_type, count: int = 10):
         """查询视频审核列表"""
         url = self.kol_url + "/kol/api/video-reviews/list"
         params = {"tab": tab_type, "page": 1, "page_size": count}
@@ -582,7 +585,7 @@ class KolsysApi(KolEnum):
         items = resp.get("items") or []
         return status, items
 
-    def query_settle_detail_list_data(self, tab_type,count:int=10):
+    def query_settle_detail_list_data(self, tab_type, count: int = 10):
         """
         查询结算明细审核列表数据
         :param tab_type:     见SettleTab
@@ -596,7 +599,7 @@ class KolsysApi(KolEnum):
         logger.debug(json.dumps(items))
         return status, items
 
-    def query_kolline_daren_email_list_data(self,count: int = 10):
+    def query_kolline_daren_email_list_data(self, count: int = 10):
         """获取初次建联达人邮箱列表"""
         url = self.kolline_url + "/kollink/api/talents/email-candidates"
         params = {"page": 1, "page_size": count}
@@ -611,7 +614,7 @@ class KolsysApi(KolEnum):
         email_list = resp.get("data", {}).get("list", [])
         return status, email_list
 
-    def query_kolline_follow_up_email_list_data(self,count: int = 10):
+    def query_kolline_follow_up_email_list_data(self, count: int = 10):
         """获取follow_up邮箱列表"""
         url = self.kolline_url + "/kollink/api/email/send-detail-candidates"
         params = {"page": 1, "page_size": count}
@@ -626,7 +629,7 @@ class KolsysApi(KolEnum):
         email_list = resp.get("data", {}).get("list", [])
         return status, email_list
 
-    def query_email_send_record(self,count: int = 10):
+    def query_email_send_record(self, count: int = 10):
         """查询建联邮件发送记录"""
         url = self.kolline_url + "/kollink/api/email/batches"
         params = {"page": 1, "page_size": count, "source": "send_record"}
@@ -641,7 +644,7 @@ class KolsysApi(KolEnum):
         email_list = resp.get("data", {}).get("list", [])
         return status, email_list
 
-    def query_data_analysis_by_daren_select(self, task_source,count: int = 10):
+    def query_data_analysis_by_daren_select(self, task_source, count: int = 10):
         """获取数据分析列表数据"""
         url = self.kolline_url + "/kollink/api/email/batches"
         params = [
@@ -649,7 +652,7 @@ class KolsysApi(KolEnum):
             ("status", "partial_completed"),
             ("status", "completed"),
             ("status", "failed"),
-            ("sender_users",self.user_name),
+            ("sender_users", self._share.get_or_fetch(key="user_name",default="")),
             ("date_start", get_before_date(days=30, template="Ymd")),
             ("date_end", get_before_date(days=0, template="Ymd")),
             ("page", "1"),
@@ -668,88 +671,201 @@ class KolsysApi(KolEnum):
         send_record = resp.get("data", {}).get("list", [])
         return status, send_record
 
-
-    def get_leadhub_record(self,platform,countrys:list[""],count: int = 10,):
+    def get_leadhub_record(self, platform, countrys: list[str], count: int = 10, ):
         """获取线索库记录"""
         url = self.kol_leadhub_url + "/leadhub/api/leads/pull"
-        payload = {"platform":platform,"countries":countrys,"requested_count":count}
+        payload = {"platform": platform, "countries": countrys, "requested_count": count}
         status, resp = my_post(url, headers=self.headers, data=payload)
         if not status:
             return status, resp
         logger.debug(json.dumps(resp, indent=4))
 
-    def get_projects_list_data(self,count: int = 10):
+    def get_projects_list_data(self, count: int = 10):
         """获取项目管理列表数据"""
-        url=self.kol_delivery_url+"/delivery/api/projects/list"
+        url = self.kol_delivery_url + "/delivery/api/projects/list"
         params = {"page": 1, "page_size": count}
         status, resp = my_get(url, headers=self.headers, params=params)
         if not status:
             return status, resp
 
-        items=resp.get("items", [])
+        items = resp.get("items", [])
+        # 存放项目code
+        if items:
+            self._share.put_only(key="project_code", value=items[0].get("code"), skip_empty=True)
         # logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
         return status, items
 
-    def get_batch_list_data(self,count: int = 10):
+    def get_batch_list_data(self, count: int = 10):
         """获取批次管理列表数据"""
-        url=self.kol_delivery_url+"/delivery/api/batches/list"
+        url = self.kol_delivery_url + "/delivery/api/batches/list"
         params = {"page": 1, "page_size": count}
         status, resp = my_get(url, headers=self.headers, params=params)
         if not status:
             return status, resp
 
-        items=resp.get("items", [])
+        items = resp.get("items", [])
+        # 存批次号
+        if items:
+            self._share.put_only(key="batch_code", value=items[0].get("code"))
         # logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
         return status, items
 
-    def get_experimen_list_data(self,count: int = 10):
+    def get_experimen_list_data(self, count: int = 10):
         """获取实验管理列表数据"""
-        url=self.kol_delivery_url+"/delivery/api/experiments/list"
+        url = self.kol_delivery_url + "/delivery/api/experiments/list"
         params = {"page": 1, "page_size": count}
         status, resp = my_get(url, headers=self.headers, params=params)
         if not status:
             return status, resp
 
-        items=resp.get("items", [])
-        logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
+        items = resp.get("items", [])
+        # logger.debug(json.dumps(items, indent=2, ensure_ascii=False))
+        if items:
+            # 存实验code
+            self._share.put_only(key="experiment_code", value=items[0].get("code"))
+            # 存实验媒体平台
+            self._share.put_only(key="experiment_media_platform", value=items[0].get("media_platform"))
+
         return status, items
 
-    def get_create_ad_video_list_data(self,experiment_code:str,platform:list[str],count: int = 10):
+    def get_create_ad_video_list_data(self, experiment_code: str = None, platform: str = None, count: int = 10):
         """
         获取新建广告中的视频列表数据
         :param experiment_code:     实验code
         :param platform         媒体平台
         """
-        url=self.kol_delivery_url+"/delivery/api/materials/list"
-        payload = {"experiment_code":experiment_code,"media_platform":platform,"page":1,"page_size":count}
+        url = self.kol_delivery_url + "/delivery/api/materials/list"
+        if experiment_code is None or platform is None:
+            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data)
+            platform = self._share.get_or_fetch(key="experiment_media_platform", fetcher=self.get_experimen_list_data)
+        # 不支持该渠道
+        if platform in ["Instagram", "VK"]:
+            return True, []
+        payload = {"experiment_code": experiment_code, "media_platform": [platform], "page": 1, "page_size": count}
         status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
         if not status:
             return status, resp
-        logger.debug(json.dumps(resp, indent=2))
 
+        items = resp.get("items", [])
+        # logger.debug(json.dumps(items, indent=2))
+        return status, items
 
+    def business_get_projects_detail(self, project_code: str = None):
+        """
+        获取项目详情信息
+        """
+        if project_code is None:
+            project_code = self._share.get_or_fetch(key="project_code", fetcher=self.get_projects_list_data)
+        url = self.kol_delivery_url + "/delivery/api/projects/detail"
+        params = {"project_code": project_code}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        # logger.debug(json.dumps(resp, indent=2))
+        return status, resp
 
+    def business_get_batch_detail(self, batch_code: str = None):
+        """
+        获取批次详情
+        """
+        if batch_code is None:
+            batch_code = self._share.get_or_fetch(key="batch_code", fetcher=self.get_batch_list_data)
+        url = self.kol_delivery_url + "/delivery/api/batches/detail"
+        params = {"batch_code": batch_code}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        # logger.debug(json.dumps(resp, indent=2))
+        return status, resp
+
+    def business_get_experimen_detail(self, experiment_code: str = None):
+        """
+        获取实验详情
+        """
+        if experiment_code is None:
+            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data)
+        url = self.kol_delivery_url + "/delivery/api/experiments/detail"
+        params = {"experiment_code": experiment_code}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        # logger.debug(json.dumps(resp, indent=2))
+        return status, resp
+
+    def business_get_experimen_ads_list(self, experiment_code: str = None, count: int = 10):
+        """
+        获取实验广告列表
+        """
+        if experiment_code is None:
+            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data)
+        url = self.kol_delivery_url + "/delivery/api/experiments/ads"
+        params = {"experiment_code": experiment_code, "page": 1, "page_size": count}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        items = resp.get("items", [])
+        # logger.debug(json.dumps(items, indent=2))
+        return status, items
+
+    def get_adplatform_api_configs_list_data(self, type):
+        """
+        获取投流配置数据
+        type        country--国家     media_platform--媒体平台      experiment_level--实验级别
+        submit_status--创建状态     delivery_status--投放状态       experiment_category--实验分类
+        """
+        url = self.kol_delivery_url + "/delivery/api/configs/list"
+        params = {"type": type}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        items = resp.get("items", [])
+        # logger.debug(json.dumps(items, indent=2))
+        return status, items
+
+    def get_expand_backfill_list_data(self, count: int = 10):
+        """
+        数据维护--拓展补数
+        """
+        url = self.kol_url + '/kol/api/video-backfill/expand/list'
+        params = {"page": 1, "page_size": count}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        items = resp.get("data", {}).get("items", [])
+        # logger.debug(json.dumps(items, indent=2))
+        return status, items
+
+    def get_data_repair_list_data(self, count: int = 10):
+        """
+        数据维护--数据修复
+        """
+        url = self.kol_url + '/kol/api/video-backfill/repair/list'
+        params = {"page": 1, "page_size": count}
+        status, resp = my_get(url, headers=self.headers, params=params)
+        if not status:
+            return status, resp
+        items = resp.get("data", {}).get("items", [])
+        logger.debug(json.dumps(items, indent=2))
+        return status, items
 
 
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
-    user_email='liuli@hungrystudio.com'   # 组员
+    # user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
     # user_email = "yekaiwulatai@hungrystudio.com"    #组长   dbbida8dupss73b6bht0
-    # user_email='licongze@hungrystudio.com'
     # user_email='wangyaoying@hungrystudio.com'
-    # user_email='liyajun@hungrystudio.com'
+    # user_email='licongze@hungrystudio.com'
+    # user_email='liyajun@hungrystudio.com'     # 队长
     # user_email='huangyunru@hungrystudio.com'  # 春兰
     # user_email='liangxiaotong@hungrystudio.com'  # CZ15FXK891-26100001
+    # user_email='dingyongliang@hungrystudio.com'
     kolsys_api.get_user_token(user_email, is_set_cache=False,
                               domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
 
-    kolsys_api.get_experimen_list_data()
-    # kolsys_api.create_order(res_id=KolEnum.PersonID.,media_source_list=[KolEnum.Channel.Social_tiktok.value])
-    # kolsys_api.get_jp_regions()
-    # kolsys_api.get_jp_cities(43)
-    # print(get_before_date(days=0,template="Ymd"))
+    kolsys_api.business_get_projects_detail()
+
