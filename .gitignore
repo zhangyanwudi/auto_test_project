@@ -20,3 +20,6 @@ backend/build/
 backend/dist/
 backend/build_venv/
 backend/*.spec
+
+# 巡检上传文件运行时生成的唯一副本（每次执行替换 {{user_name}} 后产出）
+backend/data/auto_file/generated/

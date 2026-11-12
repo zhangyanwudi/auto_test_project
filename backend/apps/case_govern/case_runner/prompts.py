@@ -32,6 +32,15 @@ EXPLORER_SYSTEM_PROMPT = """你是网页自动化巡检助手，在真实浏览�
 - press(ref, key)    在 ref 对应输入框按键（如 Enter 触发搜索）
 - wait(ms)           等待若干毫秒，让页面/数据渲染
 - goto(url)          跳转到指定 URL
+- upload(ref)        向元素清单里 kind=file 的上传框上传文件（文件路径固定如下）
+
+## 文件上传（upload）
+
+当目标涉及「上传/批量上传/导入文件」时：
+- 上传框在元素清单里 kind=file，直接用 upload(ref) 上传，**禁止用 type/fill 往文件框填路径**。
+- 可上传的文件路径已由系统提供，执行 upload 时**不要自己编 C:\\fakepath\\ 之类的伪路径**。
+
+{upload_file_path}
 
 ## 达成/失败
 
@@ -45,6 +54,7 @@ EXPLORER_SYSTEM_PROMPT = """你是网页自动化巡检助手，在真实浏览�
 2. 找不到目标元素时不要放弃：尝试换菜单、滚动、换关键词、搜索、等待渲染等不同方式。
 3. 每轮动作数量不要太多（一般 1~3 个），执行结果会回喂给你，再决定下一步。
 4. 除非你已确认达成目标、或确认页面确实没有所需元素，否则不要 done。
+5. 上传文件用 upload(ref)，不要用 type；上传后要等待页面解析并在列表里确认出现了上传的达人/数据。
 """
 
 
@@ -72,6 +82,7 @@ FINALIZE_SPEC_PROMPT = """你是网页自动化巡检助手。下面给出一段
 - 打开 <网址>
 - 点击 <按钮/菜单/元素文字>
 - 输入 <字段名> 为 <内容>
+- 上传 <文件>
 - 等待 N秒
 - 按键 <键名>
 - 截图
@@ -87,6 +98,7 @@ FINALIZE_SPEC_PROMPT = """你是网页自动化巡检助手。下面给出一段
 
 - click 的 label = 元素显示文字 → 写成 `点击 <label>`（label 为空才可写 ref 对应的可点目标）
 - type 的 label = 输入框关联的字段名 → 写成 `输入 <label> 为 <text>`（label 为空时才可写 ref 对应的字段名）
+- upload 的 label = 上传框显示文字 → 写成 `上传 <label>`（label 为空才可写「上传 文件」）
 - wait 的 ms = 真实等待的毫秒数 → 换算成「向上取整到 0.5 秒」的秒数，写成 `等待 N秒`
   （例如 ms=2000 → `等待 2秒`；ms=1500 → `等待 1.5秒`）
 - goto 的 url → 作为 precondition，不要写进 step
@@ -108,9 +120,19 @@ FINALIZE_SPEC_PROMPT = """你是网页自动化巡检助手。下面给出一段
 """
 
 
-def build_explorer_system_prompt():
-    """探索循环的 system prompt。"""
-    return EXPLORER_SYSTEM_PROMPT
+def build_explorer_system_prompt(upload_file_path=None):
+    """探索循环的 system prompt。
+
+    :param upload_file_path: 上传类巡检要上传的本地文件绝对路径；为 None 时告诉 AI 当前无可用上传文件。
+
+    注意：EXPLORER_SYSTEM_PROMPT 里含 AI 决策的 JSON 示例（大量花括号），
+    不能用 str.format() 整体格式化，这里只 replace 占位符 {upload_file_path}。
+    """
+    if upload_file_path:
+        upload_hint = f'当前可上传文件路径：`{upload_file_path}`'
+    else:
+        upload_hint = '⚠️ 当前未配置可上传文件（UPLOAD_FILE_PATH 为空），如需上传请先配置文件路径。'
+    return EXPLORER_SYSTEM_PROMPT.replace('{upload_file_path}', upload_hint)
 
 
 def build_finalize_spec_prompt():

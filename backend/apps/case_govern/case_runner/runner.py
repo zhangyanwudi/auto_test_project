@@ -7,14 +7,74 @@
   2. 注入巡检账号登录态（默认 zhangyan02195@***.com），避免访问 SSO 站点被重定向到登录页；
   3. explorer.run_explore_loop 自主探索：AI 观察页面 → 决策 → 执行 → 失败回喂重试；
   4. 探索成功后用真实动作序列反推「节点规范草稿」，失败则返回卡点 + 日志路径。
+
+批量上传类巡检：执行前把 UPLOAD_FILE_PATH 改成要上传的本地文件绝对路径，
+或调用 run_explore(user_description, upload_file_path='xxx') 显式传入。
 """
 import json
+import os
 import re
 
 from .step_logger import StepLogger
 
+# 批量上传模板路径（相对 backend 目录）。每次执行上传类巡检前，
+# 会自动把模板里的 {{user_name}} 占位符替换成唯一名（auto_+时间戳）生成副本再上传。
+UPLOAD_FILE_PATH = "data/auto_file/达人批量上传模板.xlsx"
+
+# 模板里要替换成唯一名的占位符
+UPLOAD_FILE_REPLACE_VAR = "{{user_name}}"
+
 # 巡检执行器注入登录态用的默认账号（拉取 token 时传的邮箱，须为完整真实邮箱）
 EXPLORE_ACCOUNT_EMAIL = "zhangyan02195@hungrystudio.com"
+
+
+def _gen_unique_name():
+    """生成唯一达人名：auto_ + 年月日时分秒（如 auto_20261112153045），避免多次上传重名。"""
+    from datetime import datetime
+    return 'auto_' + datetime.now().strftime('%Y%m%d%H%M%S')
+
+
+def _prepare_upload_file(template_path):
+    """准备上传文件：把模板里的 {{user_name}} 替换成唯一名，生成唯一副本。
+
+    - 模板含 UPLOAD_FILE_REPLACE_VAR 占位符 → 替换成唯一名，副本存到模板同目录 generated/ 下；
+    - 模板不含占位符 → 视为已准备好的文件，直接返回其绝对路径；
+    - 相对路径以 backend（settings.BASE_DIR）为基准转绝对路径。
+
+    :return: (ok, path|error_msg)
+    """
+    import openpyxl
+    from django.conf import settings
+
+    base = str(settings.BASE_DIR)
+    abs_template = template_path if os.path.isabs(template_path) else os.path.join(base, template_path)
+    if not os.path.isfile(abs_template):
+        return False, f'上传文件不存在：{abs_template}'
+
+    wb = openpyxl.load_workbook(abs_template)
+    try:
+        has_var = any(
+            isinstance(c.value, str) and UPLOAD_FILE_REPLACE_VAR in c.value
+            for ws in wb.worksheets for row in ws.iter_rows() for c in row
+        )
+        if not has_var:
+            return True, abs_template
+
+        unique_name = _gen_unique_name()
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for c in row:
+                    if isinstance(c.value, str) and UPLOAD_FILE_REPLACE_VAR in c.value:
+                        c.value = c.value.replace(UPLOAD_FILE_REPLACE_VAR, unique_name)
+
+        out_dir = os.path.join(os.path.dirname(abs_template), 'generated')
+        os.makedirs(out_dir, exist_ok=True)
+        stem = os.path.splitext(os.path.basename(abs_template))[0]
+        out_path = os.path.join(out_dir, f'{stem}_{unique_name}.xlsx')
+        wb.save(out_path)
+        return True, out_path
+    finally:
+        wb.close()
 
 
 def _call_ai(messages):
@@ -111,7 +171,7 @@ def _empty_result(spec='', error=None, log_path=''):
             'error': error, 'log_path': log_path}
 
 
-def run_explore(user_description):
+def run_explore(user_description, upload_file_path=None):
     """完整试运行：提取 URL → 自主探索 → 反推规范 → 返回报告。
 
     流程（agentic 探索，而不是盲写规范）：
@@ -142,6 +202,18 @@ def run_explore(user_description):
         return _empty_result(error='用户描述中未找到页面地址（需含 http:// 或 https:// 开头的 URL）',
                              log_path=log_path)
 
+    # 上传文件路径：优先用调用方传入的，否则回退到模块级常量 UPLOAD_FILE_PATH
+    if upload_file_path is None:
+        upload_file_path = UPLOAD_FILE_PATH
+    upload_file_path = (upload_file_path or '').strip()
+
+    # 若指定了模板，每次执行前替换 {{user_name}} 为唯一名，生成唯一副本再上传
+    if upload_file_path:
+        ok, prepared = _prepare_upload_file(upload_file_path)
+        if not ok:
+            return _empty_result(error=prepared, log_path=log_path)
+        upload_file_path = prepared
+
     step_logger = StepLogger(case_name=start_url)
     try:
         from playwright.sync_api import sync_playwright
@@ -152,7 +224,7 @@ def run_explore(user_description):
             page = context.new_page()
             page.goto(start_url, wait_until='domcontentloaded', timeout=30000)
 
-            success, actions, note = run_explore_loop(page, user_description)
+            success, actions, note = run_explore_loop(page, user_description, upload_file_path=upload_file_path)
 
             # 探索结束后的页面截图
             try:

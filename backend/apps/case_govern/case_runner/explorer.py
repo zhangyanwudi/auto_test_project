@@ -7,7 +7,7 @@
     打开起始 URL
       → 循环（最多 max_rounds 轮）：
           1. observe_page 提取当前页面可交互元素（带 ref 编号的清单）
-          2. 把「清单 + 目标 + 历史」发给 AI，让它下指令（click/type/press/wait/goto）
+          2. 把「清单 + 目标 + 历史」发给 AI，让它下指令（click/type/press/wait/goto/upload）
           3. 按 ref 直接定位执行，记录结果
           4. 失败原因回喂给 AI，下一轮换方式重试
       → AI 声明 done（成功）或 failed（穷尽）
@@ -16,6 +16,7 @@
 全程通过 case_explore 日志记录探索轨迹，失败时可按日志路径定位问题。
 """
 import json
+import os
 import re
 
 try:
@@ -59,8 +60,24 @@ def _extract_candidates_js():
         result.push({ref: idx, kind, label: String(label || '').trim().slice(0, 80)});
         idx += 1;
       };
+      // 关联表单项里取 label 文案（批量上传框常是隐藏的无文字 input，靠这个给 AI 提示语义）
+      const formLabel = (el) => {
+        const formItem = el.closest('.arco-form-item, .el-form-item, .ant-form-item, [class*="form-item"]');
+        if (formItem) {
+          const labelEl = formItem.querySelector('.arco-form-item-label, .el-form-item__label, .ant-form-item-label, label');
+          if (labelEl) return (labelEl.innerText || '').trim();
+        }
+        return '';
+      };
 
-      // 1. 可点击元素：菜单项、链接、按钮、以及带点击语义的元素
+      // 1. 文件上传框：input[type=file] 常被样式隐藏（offset 为 0），不能按可见性过滤，
+      //    单列为 file 类型，AI 用 upload(ref) 上传
+      document.querySelectorAll('input[type="file"]').forEach(el => {
+        const label = formLabel(el) || el.getAttribute('aria-label') || el.name || '上传文件';
+        push(el, 'file', label);
+      });
+
+      // 2. 可点击元素：菜单项、链接、按钮、以及带点击语义的元素
       const clickables = document.querySelectorAll(
         'a, button, .arco-menu-item, .el-menu-item, .ant-menu-item, [class*="menu-item"], [role="menuitem"], [role="button"], [role="tab"], [class*="tab"], .arco-dropdown-menu-item'
       );
@@ -70,31 +87,21 @@ def _extract_candidates_js():
         if (t) push(el, 'click', t);
       });
 
-      // 2. 输入框：input / textarea / contenteditable，label 优先取关联表单项文字
+      // 3. 输入框：input / textarea / contenteditable（文件框已在上方单独处理，这里跳过）
       const inputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
       inputs.forEach(el => {
-        if (el.type === 'hidden') return;
+        if (el.type === 'hidden' || el.type === 'file') return;
         if (el.offsetWidth === 0 && el.offsetHeight === 0 && el.tagName !== 'TEXTAREA') return;
-        let label = '';
-        const formItem = el.closest('.arco-form-item, .el-form-item, .ant-form-item, [class*="form-item"]');
-        if (formItem) {
-          const labelEl = formItem.querySelector('.arco-form-item-label, .el-form-item__label, .ant-form-item-label, label');
-          if (labelEl) label = labelEl.innerText || '';
-        }
+        let label = formLabel(el);
         if (!label) label = el.getAttribute('placeholder') || el.getAttribute('aria-label') || el.name || '';
         push(el, 'input', label);
       });
 
-      // 3. 下拉/选择
+      // 4. 下拉/选择
       const selects = document.querySelectorAll('select, [role="combobox"], .arco-select, [class*="select"]');
       selects.forEach(el => {
         if (el.offsetWidth === 0 && el.offsetHeight === 0) return;
-        let label = '';
-        const formItem = el.closest('.arco-form-item, .el-form-item, .ant-form-item, [class*="form-item"]');
-        if (formItem) {
-          const labelEl = formItem.querySelector('.arco-form-item-label, .el-form-item__label, .ant-form-item-label, label');
-          if (labelEl) label = labelEl.innerText || '';
-        }
+        let label = formLabel(el);
         if (!label) label = el.getAttribute('placeholder') || el.getAttribute('aria-label') || el.innerText || '';
         push(el, 'select', label);
       });
@@ -115,6 +122,12 @@ def observe_page(page):
         state['title'] = page.title()
     except Exception:  # noqa: BLE001
         pass
+
+    # 页面上的文件上传框数量（含被样式隐藏的 input[type=file]），供 AI 判断是否有上传入口
+    try:
+        state['file_input_count'] = page.locator('input[type="file"]').count()
+    except Exception:  # noqa: BLE001
+        state['file_input_count'] = 0
 
     try:
         raw = page.evaluate(_extract_candidates_js())
@@ -167,6 +180,10 @@ def _format_observe(state):
     lines.append('')
     list_state = state.get('has_list_data')
     lines.append('列表数据情况：' + ('有数据' if list_state else ('无数据' if list_state is False else '未知')))
+
+    fc = state.get('file_input_count')
+    if fc:
+        lines.append(f'文件上传框数量：{fc}（元素清单里 kind=file 的即为上传框，用 upload(ref) 上传）')
     return '\n'.join(lines)
 
 
@@ -209,8 +226,11 @@ def _ref_label(elements, ref):
     return ''
 
 
-def _do_action(page, action, elements):
-    """执行单个动作，返回 (是否成功, 结果说明)。失败抛 ExploreError。"""
+def _do_action(page, action, elements, upload_file_path=None):
+    """执行单个动作，返回 (是否成功, 结果说明)。失败抛 ExploreError。
+
+    :param upload_file_path: 上传类动作的兜底文件路径；AI 未在 action 里给 path 时用它。
+    """
     act = (action or {}).get('action')
     ref = action.get('ref')
 
@@ -234,6 +254,29 @@ def _do_action(page, action, elements):
         except Exception as e:  # noqa: BLE001
             raise ExploreError(f'输入 ref={ref} 失败：{e}')
         return f'输入 ref={ref} = {text}'
+
+    if act == 'upload':
+        # 上传文件：走 input[type=file].set_input_files，不能用 fill（文件框禁止 fill 填路径）。
+        # 文件路径优先用 AI 给的，AI 没给则用系统配置的 upload_file_path 兜底。
+        if ref is None:
+            raise ExploreError('upload 缺少 ref')
+        file_path = action.get('path') or action.get('text') or upload_file_path or ''
+        if not file_path:
+            raise ExploreError('upload 缺少文件路径：请在 UPLOAD_FILE_PATH 或调用参数里指定真实文件')
+        # 路径归一化：AI 可能给出 Windows 反斜杠、浏览器伪路径、或被引号包裹的字符串
+        if file_path.startswith('C:\\fakepath\\') or file_path.startswith('C:/fakepath/'):
+            raise ExploreError(f'AI 给出了浏览器伪路径（{file_path}），请改用 UPLOAD_FILE_PATH 指定的真实文件路径')
+        file_path = file_path.strip().strip('"\'').replace('\\', '/')
+        if not os.path.isabs(file_path):
+            raise ExploreError(f'上传路径不是绝对路径：{file_path}')
+        if not os.path.isfile(file_path):
+            raise ExploreError(f'上传文件不存在：{file_path}')
+        loc = _ref_locator(page, ref)
+        try:
+            loc.first.set_input_files(file_path, timeout=10000)
+        except Exception as e:  # noqa: BLE001
+            raise ExploreError(f'上传文件 ref={ref} 失败：{e}')
+        return f'上传文件 ref={ref} = {file_path}'
 
     if act == 'press':
         key = action.get('key', 'Enter')
@@ -285,8 +328,10 @@ def _build_history_text(history):
     return '\n'.join(lines)
 
 
-def run_explore_loop(page, goal, max_rounds=10):
+def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None):
     """在 page 上执行自主探索循环，直到 AI 声明 done。
+
+    :param upload_file_path: 上传类巡检要上传的本地文件绝对路径；为 None 时 AI 无法执行 upload 动作
 
     返回 (success, actions, last_note)：
       - success: bool，是否达成目标
@@ -295,11 +340,11 @@ def run_explore_loop(page, goal, max_rounds=10):
     """
     from .prompts import build_explorer_system_prompt
 
-    system = build_explorer_system_prompt()
+    system = build_explorer_system_prompt(upload_file_path=upload_file_path)
     history = []
     performed_actions = []  # 真实走通的完整动作序列
 
-    explore_logger.info('[巡检探索] 目标={} 开始，最多 {} 轮', goal, max_rounds)
+    explore_logger.info('[巡检探索] 目标={} 开始，最多 {} 轮，上传文件={}', goal, max_rounds, upload_file_path or '（未配置）')
 
     for round_no in range(1, max_rounds + 1):
         state = observe_page(page)
@@ -349,10 +394,10 @@ def run_explore_loop(page, goal, max_rounds=10):
         round_ok = True
         for act in actions:
             # 执行前补上 ref 对应的元素文字，反推规范时能给出确定性元素名
-            if act.get('action') in ('click', 'type') and act.get('ref') is not None:
+            if act.get('action') in ('click', 'type', 'upload') and act.get('ref') is not None:
                 act['label'] = _ref_label(state.get('elements') or [], act.get('ref'))
             try:
-                result_text = _do_action(page, act, state.get('elements') or [])
+                result_text = _do_action(page, act, state.get('elements') or [], upload_file_path=upload_file_path)
                 performed_actions.append(act)
                 round_result_parts.append(result_text)
                 explore_logger.info('[巡检探索] 第 {} 轮执行 {} ref={} text={} → 成功',

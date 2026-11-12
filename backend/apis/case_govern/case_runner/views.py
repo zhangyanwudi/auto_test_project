@@ -81,39 +81,30 @@ def case_explore(request):
     return _ok(result)
 
 
-@csrf_exempt
-@require_http_methods(['POST'])
-@require_valid_token
-def case_solidify(request):
-    """用户确认规范后，固化为用例（自动建节点树）。
+def _do_solidify(case_name, spec, creator=''):
+    """把规范草稿固化为用例：建主表 + 节点树（precondition/step/result）。
 
-    body: { case_name, spec }
-    返回: 新建用例的 id + case_name
+    供 case_solidify 接口与 AI 助手「确认固化」共用。
+
+    :param case_name: 用例名称
+    :param spec:      规范草稿文本（含【precondition】/【step】/【result】三段）
+    :param creator:   创建人（用户中文名或用户名）
+    :return: (ok, data|error_msg)。ok 为 True 时 data 为 {'id': ..., 'case_name': ...}。
     """
-    body = _parse_body(request)
-    if body is None:
-        return _fail('请求体格式错误')
-    case_name = (body.get('case_name') or '').strip()
-    spec = (body.get('spec') or '').strip()
+    case_name = (case_name or '').strip()
+    spec = (spec or '').strip()
     if not case_name or not spec:
-        return _fail('缺少 case_name 或 spec')
+        return False, '缺少 case_name 或 spec'
 
     nodes = _parse_spec_to_nodes(spec)
     if not nodes['precondition']:
-        return _fail('规范草稿中未提取到页面地址，无法固化')
+        return False, '规范草稿中未提取到页面地址，无法固化'
 
     # 构建节点树：根（module=用例名） → 前置（precondition） → 步骤（step） → 结果（result）
     children = []
-    # precondition 节点
-    children.append({
-        'title': nodes['precondition'],
-        'node_type': 'precondition',
-        'children': [],
-    })
-    # step 节点
+    children.append({'title': nodes['precondition'], 'node_type': 'precondition', 'children': []})
     for s in nodes['steps']:
         children.append({'title': s, 'node_type': 'step', 'children': []})
-    # result 节点
     for r in nodes['results']:
         children.append({'title': r, 'node_type': 'result', 'children': []})
 
@@ -128,19 +119,43 @@ def case_solidify(request):
         'children': children,
     }
 
+    from apps.case_govern.views import _normalize_node, _sync_case_nodes
+    from django.db import transaction
+
     case = ZCaseGovernCase.objects.create(
         case_name=case_name,
         module='',
         priority=2,
         status=1,
-        creator=request.z_user.user_cn_name or request.z_user.user_name,
+        creator=creator,
         description='',
         image='',
     )
-
-    from apps.case_govern.views import _normalize_node, _sync_case_nodes
-    from django.db import transaction
     with transaction.atomic():
         _sync_case_nodes(case.id, _normalize_node(tree))
 
-    return _ok({'id': case.id, 'case_name': case.case_name}, '固化成功')
+    return True, {'id': case.id, 'case_name': case.case_name}
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@require_valid_token
+def case_solidify(request):
+    """用户确认规范后，固化为用例（自动建节点树）。
+
+    body: { case_name, spec }
+    返回: 新建用例的 id + case_name
+    """
+    body = _parse_body(request)
+    if body is None:
+        return _fail('请求体格式错误')
+
+    creator = request.z_user.user_cn_name or request.z_user.user_name
+    ok, result = _do_solidify(
+        (body.get('case_name') or '').strip(),
+        (body.get('spec') or '').strip(),
+        creator=creator,
+    )
+    if not ok:
+        return _fail(result)
+    return _ok(result, '固化成功')

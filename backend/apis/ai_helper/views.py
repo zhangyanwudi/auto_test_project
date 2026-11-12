@@ -710,6 +710,37 @@ def _format_case_explore_report(result):
     return '\n'.join(lines)
 
 
+def _try_solidify_from_conversation(user, conv):
+    """尝试从对话历史中提取「巡检规范草稿」并固化为用例（供「确认固化」触发）。
+
+    从最近的 assistant 消息里解析出 spec（含【precondition】/【step】/【result】），
+    用例名取对话标题（空则回退为「巡检用例」）。
+
+    :return: (ok, data|error_msg)。ok 为 True 时 data 为 {'id': ..., 'case_name': ...}。
+    """
+    import re
+
+    last_assistant = AiMessage.objects.filter(
+        conversation=conv, role='assistant'
+    ).order_by('-id').first()
+    if not last_assistant:
+        return False, '当前对话里还没有巡检规范草稿，请先发送 @生成巡检规范 生成一份'
+
+    spec = last_assistant.content or ''
+    if '【precondition】' not in spec or ('【step】' not in spec and '【result】' not in spec):
+        return False, '最近一条回复里没有完整的巡检规范草稿（缺少 precondition/step/result）'
+
+    # 去掉报告里的「📋 巡检规范草稿」「🧪 试运行结果」等排版前缀，仅保留规范文本
+    # （若 assistant 消息里只有规范草稿，则原样使用）
+    match = re.search(r'【precondition】.*', spec, re.DOTALL)
+    spec_text = match.group(0) if match else spec
+
+    case_name = (conv.title or '').strip() or '巡检用例'
+
+    from apis.case_govern.case_runner.views import _do_solidify
+    return _do_solidify(case_name, spec_text, creator=(user.user_cn_name or user.user_name))
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 @require_valid_token
@@ -768,6 +799,29 @@ def chat(request):
     #    目的：防止上下文过长导致 AI 回复超时或失败；减少无关 token 消耗。
     #    不以 @ 开头的消息（如回复行号"20"）则保留完整历史上下文。
     is_at_command = message.startswith('@')
+
+    # 6.1 「确认固化」：用户回复该词时，把对话里最新的巡检规范草稿固化为用例。
+    #     不走 AI 网关，直接本地解析 + 建树，避免额外的网关调用。
+    if not is_at_command and message.strip() in ('确认固化', '确认固化为用例', '确认保存'):
+        ok, result = _try_solidify_from_conversation(user, conv)
+        if ok:
+            reply = f'✅ 已固化用例「{result["case_name"]}」（ID={result["id"]}）'
+        else:
+            reply = f'⚠️ 固化失败：{result}'
+        logger.info('「确认固化」处理完成：ok=%s, result=%s', ok, result)
+        save_assistant_message(conv, reply)
+        conv.save(update_fields=['update_time'])
+        return JsonResponse({
+            'code': 0,
+            'data': {
+                'conversation_code': conv.conversation_code,
+                'reply': reply,
+                'title': conv.title,
+                'model_provider': model_provider,
+                'model': active_model,
+            },
+        })
+
     try:
         # ── 根据模型后端选择 system prompt ──
         # 本地模型上下文窗口较小（4096 tokens），使用精简版 prompt
