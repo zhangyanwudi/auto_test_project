@@ -736,8 +736,8 @@ class KolsysApi(KolEnum):
         """
         url = self.kol_delivery_url + "/delivery/api/materials/list"
         if experiment_code is None or platform is None:
-            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data)
-            platform = self._share.get_or_fetch(key="experiment_media_platform", fetcher=self.get_experimen_list_data)
+            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data,default="")
+            platform = self._share.get_or_fetch(key="experiment_media_platform", fetcher=self.get_experimen_list_data,default="")
         # 不支持该渠道
         if platform in ["Instagram", "VK"]:
             return True, ["没有数据是正常的，在列表补个占位"]
@@ -756,7 +756,7 @@ class KolsysApi(KolEnum):
         获取项目详情信息
         """
         if project_code is None:
-            project_code = self._share.get_or_fetch(key="project_code", fetcher=self.get_projects_list_data)
+            project_code = self._share.get_or_fetch(key="project_code", fetcher=self.get_projects_list_data,default="")
         url = self.kol_delivery_url + "/delivery/api/projects/detail"
         params = {"project_code": project_code}
         status, resp = my_get(url, headers=self.headers, params=params)
@@ -770,7 +770,7 @@ class KolsysApi(KolEnum):
         获取批次详情
         """
         if batch_code is None:
-            batch_code = self._share.get_or_fetch(key="batch_code", fetcher=self.get_batch_list_data)
+            batch_code = self._share.get_or_fetch(key="batch_code", fetcher=self.get_batch_list_data,default="")
         url = self.kol_delivery_url + "/delivery/api/batches/detail"
         params = {"batch_code": batch_code}
         status, resp = my_get(url, headers=self.headers, params=params)
@@ -784,7 +784,7 @@ class KolsysApi(KolEnum):
         获取实验详情
         """
         if experiment_code is None:
-            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data)
+            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data,default="")
         url = self.kol_delivery_url + "/delivery/api/experiments/detail"
         params = {"experiment_code": experiment_code}
         status, resp = my_get(url, headers=self.headers, params=params)
@@ -798,7 +798,7 @@ class KolsysApi(KolEnum):
         获取实验广告列表
         """
         if experiment_code is None:
-            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data)
+            experiment_code = self._share.get_or_fetch(key="experiment_code", fetcher=self.get_experimen_list_data,default="")
         url = self.kol_delivery_url + "/delivery/api/experiments/ads"
         params = {"experiment_code": experiment_code, "page": 1, "page_size": count}
         status, resp = my_get(url, headers=self.headers, params=params)
@@ -851,7 +851,7 @@ class KolsysApi(KolEnum):
 
 
 if __name__ == "__main__":
-    kolsys_api = KolsysApi(is_debug=False)
+    kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
     # user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
