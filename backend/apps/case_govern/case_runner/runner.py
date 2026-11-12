@@ -11,7 +11,6 @@
 import json
 import re
 
-from .prompts import build_explore_system_prompt
 from .step_logger import StepLogger
 
 # 巡检执行器注入登录态用的默认账号（拉取 token 时传的邮箱，须为完整真实邮箱）
@@ -24,92 +23,12 @@ def _call_ai(messages):
     return call_agent_gateway(messages)
 
 
-def generate_spec(user_description):
-    """阶段一：根据用户描述生成「节点规范草稿」文本。
-
-    注意：run_explore 已改为「探索成功后再反推规范」，不再依赖盲写的 generate_spec；
-    此函数保留供需要时直接生成草稿预览使用。
-    """
-    messages = [
-        {'role': 'system', 'content': build_explore_system_prompt()},
-        {'role': 'user', 'content': user_description},
-    ]
-    reply = _call_ai(messages)
-    return reply
-
-
 def _extract_start_url(user_description):
     """从用户描述里提取起始 URL（第一个 http 开头的 token）。"""
     m = re.search(r'https?://\S+', user_description or '')
     if not m:
         return None
     return m.group(0).rstrip('，。；;、,>）)')
-
-
-
-def _parse_spec_to_nodes(spec_text):
-    """把「节点规范草稿」文本解析成 precondition/step/result 三段。
-
-    返回 dict: {"precondition": str, "steps": [str], "results": [str]}
-    """
-    pre = ''
-    steps = []
-    results = []
-    section = None
-    for line in spec_text.splitlines():
-        s = line.strip()
-        if '【precondition】' in s:
-            section = 'pre'
-            continue
-        if '【step】' in s:
-            section = 'step'
-            continue
-        if '【result】' in s:
-            section = 'result'
-            continue
-        if not s or s.startswith('#') or s.startswith('```'):
-            continue
-        if section == 'pre':
-            if s.startswith('http'):
-                pre = s
-        elif section == 'step':
-            steps.append(s)
-        elif section == 'result':
-            results.append(s)
-    return {'precondition': pre, 'steps': steps, 'results': results}
-
-
-def _build_translate_messages(spec_text):
-    """构建「翻译执行」的 AI 消息。"""
-    return [
-        {'role': 'system', 'content': build_translate_prompt()},
-        {'role': 'user', 'content': spec_text},
-    ]
-
-
-def _merge_steps_with_nodes(steps, nodes):
-    """把翻译出的 steps 与节点信息关联，便于日志里记录「来自哪个节点」。
-
-    step 动作按顺序映射 nodes.steps；assert 动作按顺序映射 nodes.results。
-    """
-    step_texts = nodes['steps']
-    result_texts = nodes['results']
-    step_idx = 0
-    result_idx = 0
-    for s in steps:
-        action = s.get('action')
-        if action == 'assert' and result_idx < len(result_texts):
-            s['node_title'] = result_texts[result_idx]
-            s['node_type'] = 'result'
-            result_idx += 1
-        elif action in ('goto', 'click', 'type', 'wait', 'screenshot', 'press'):
-            s['node_title'] = step_texts[step_idx] if step_idx < len(step_texts) else ''
-            s['node_type'] = 'step'
-            step_idx += 1
-        else:
-            s['node_title'] = ''
-            s['node_type'] = ''
-    return steps
 
 
 def _inject_explore_login(context, target_url):
