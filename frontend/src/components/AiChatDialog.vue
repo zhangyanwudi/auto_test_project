@@ -28,6 +28,7 @@ import {
   createConversation,
   sendMessage,
   fetchModels,
+  fetchConversationMessages,
 } from '../api/ai_helper/index.js'
 import ChatBody from './ChatBody.vue'
 
@@ -84,11 +85,63 @@ async function onDialogOpen() {
 
 async function onSend({ message, fileIds, onReply, onError }) {
   sending.value = true
+
+  // 巡检命令（@巡检基建平台 / @case-explore）：发送期间轮询对话消息，实时展示每步进度，
+  // 避免探索耗时较长时页面长时间无反馈，也不知道卡在哪一步。
+  const isExplore = /^@(巡检基建平台|case-explore)/.test((message || '').trim())
+  let pollTimer = null
+  let shownCount = 0
+
+  // 首次发送时若无 conversation_code，先创建一个（确保轮询有目标）
+  if (isExplore && !conversationCode.value) {
+    try {
+      const c = await createConversation()
+      if (c.code === 0 && c.data) {
+        conversationCode.value = c.data.conversation_code
+      }
+    } catch {
+      // 创建失败不阻塞，轮询会跳过
+    }
+  }
+
+  // 巡检期间轮询：把新出现的 assistant 进度消息实时追加到 messages
+  const startPolling = (convCode) => {
+    if (!convCode) return
+    const poll = async () => {
+      try {
+        const r = await fetchConversationMessages(convCode)
+        if (r.code === 0 && Array.isArray(r.data)) {
+          const assistantMsgs = r.data.filter(m => m.role === 'assistant')
+          if (assistantMsgs.length > shownCount) {
+            const fresh = assistantMsgs.slice(shownCount)
+            fresh.forEach(m => {
+              // 标记为进度消息，最终报告到达时清掉，避免与完整报告重复
+              messages.value.push({ role: 'assistant', content: m.content, _isProgress: true })
+            })
+            shownCount = assistantMsgs.length
+          }
+        }
+      } catch {
+        // 轮询失败忽略，等下次
+      }
+    }
+    poll()
+    pollTimer = setInterval(poll, 800)
+  }
+
+  if (isExplore && conversationCode.value) {
+    startPolling(conversationCode.value)
+  }
+
   try {
     const res = await sendMessage(conversationCode.value, message, fileIds, modelProvider.value)
     if (res.code === 0 && res.data) {
       if (!conversationCode.value && res.data.conversation_code) {
         conversationCode.value = res.data.conversation_code
+      }
+      if (isExplore) {
+        // 探索结束：清掉轮询期间的进度消息，只保留最终完整报告
+        messages.value = messages.value.filter(m => !m._isProgress)
       }
       onReply(res.data.reply)
     } else {
@@ -97,6 +150,10 @@ async function onSend({ message, fileIds, onReply, onError }) {
   } catch {
     onError('发送消息失败')
   } finally {
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
     sending.value = false
   }
 }

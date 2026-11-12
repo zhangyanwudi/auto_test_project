@@ -697,16 +697,14 @@ def _format_case_explore_report(result):
         icon = '✅' if s.get('status') == 'pass' else '❌'
         node = s.get('node_title') or ''
         msg = s.get('message') or ''
-        cost = s.get('cost_ms', 0)
         lines.append(
-            f"{icon} 步骤{s.get('index')} [{s.get('action')}] {node} —— "
-            f"{'通过' if s.get('status') == 'pass' else '失败'}（{cost}ms）"
+            f"{icon} {node}，结果 {'✅ 通过' if s.get('status') == 'pass' else '❌ 失败'}"
             + (f'：{msg}' if msg and s.get('status') != 'pass' else '')
         )
     lines.append('')
     if log_path:
         lines.append(f'🔍 探索日志：{log_path}')
-    lines.append('👉 回复「确认固化」将该规范保存为用例；或重新发送 @生成巡检规范 重新生成。')
+    lines.append('👉 回复「确认固化」将该规范保存为用例；或重新发送 @巡检基建平台 重新生成。')
     return '\n'.join(lines)
 
 
@@ -724,7 +722,7 @@ def _try_solidify_from_conversation(user, conv):
         conversation=conv, role='assistant'
     ).order_by('-id').first()
     if not last_assistant:
-        return False, '当前对话里还没有巡检规范草稿，请先发送 @生成巡检规范 生成一份'
+        return False, '当前对话里还没有巡检规范草稿，请先发送 @巡检基建平台 生成一份'
 
     spec = last_assistant.content or ''
     if '【precondition】' not in spec or ('【step】' not in spec and '【result】' not in spec):
@@ -818,7 +816,7 @@ def chat(request):
                 'reply': reply,
                 'title': conv.title,
                 'model_provider': model_provider,
-                'model': active_model,
+                'model': model_provider,
             },
         })
 
@@ -984,11 +982,17 @@ def chat(request):
             )
 
         elif tool_name == 'case_explore' and tool_params:
-            # 生成巡检规范 + 试运行
+            # 巡检基建平台 + 试运行
             description = tool_params.get('description', '')
             try:
                 from apps.case_govern.case_runner.runner import run_explore
-                explore_result = run_explore(description)
+
+                # 进度回报：把每步关键动作落库成 assistant 消息，前端轮询即可实时看到卡在哪一步
+                def _progress(text):
+                    save_assistant_message(conv, text)
+
+                save_assistant_message(conv, '🔍 开始巡检，正在探索页面…')
+                explore_result = run_explore(description, on_progress=_progress)
                 reply = _format_case_explore_report(explore_result)
                 logger.info('巡检试运行完成: passed=%s failed=%s',
                             explore_result.get('passed'), explore_result.get('failed'))

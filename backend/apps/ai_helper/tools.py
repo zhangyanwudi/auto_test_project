@@ -227,13 +227,13 @@ TOOLS = [
     {
         'name': 'case_explore',
         'description': (
-            '生成网页巡检规范并试运行。'
-            '用户用自然语言描述要巡检的页面和功能（如「巡检线索库页面，验证列表加载、搜索」），'
+            '巡检基建平台：默认从 https://marketing-test.youxi123.com/ 首页开始，'
+            '用户用自然语言描述要巡检的功能（如「达人管理：验证批量上传后列表出现上传的达人」），'
             '该工具会：1) 生成节点规范草稿 2) 用 Playwright 无痕浏览器试运行 3) 返回每步执行结果。'
-            '仅在用户消息以「@生成巡检规范」或「@生成规范」开头时触发。'
+            '仅在用户消息以「@巡检基建平台」开头时触发。'
         ),
         'parameters': {
-            'description': '用户对要巡检页面的自然语言描述，如「巡检 https://xxx 的线索库页面，验证列表加载和搜索功能」',
+            'description': '用户对要巡检功能的自然语言描述，如「巡检达人管理，验证批量上传后列表出现上传的达人」',
         },
     },
 ]
@@ -277,8 +277,9 @@ def build_system_prompt():
         elif key == 'case-explore':
             trigger_lines.append(f"""### @{key} / @{display} — {display}
 
-接收 `@{key}` 或 `@{display}` 命令，把命令前缀后的内容作为「要巡检页面的自然语言描述」，
-立即调用 case_explore 工具（description 参数为该描述）。""")
+接收 `@{key}` 或 `@{display}` 命令，把命令前缀后的内容作为「要巡检功能的自然语言描述」，
+立即调用 case_explore 工具（description 参数为该描述）。
+默认从 https://marketing-test.youxi123.com/ 首页开始巡检，用户无需提供 URL。""")
         else:
             trigger_lines.append(f"""### @{key} / @{display} — 执行{display}
 

@@ -24,6 +24,9 @@ UPLOAD_FILE_PATH = "data/auto_file/达人批量上传模板.xlsx"
 # 模板里要替换成唯一名的占位符
 UPLOAD_FILE_REPLACE_VAR = "{{user_name}}"
 
+# 巡检默认起始页面地址：用户描述未带 URL 时，默认从这里开始巡检
+DEFAULT_START_URL = "https://marketing-test.youxi123.com/"
+
 # 巡检执行器注入登录态用的默认账号（拉取 token 时传的邮箱，须为完整真实邮箱）
 EXPLORE_ACCOUNT_EMAIL = "zhangyan02195@hungrystudio.com"
 
@@ -91,6 +94,43 @@ def _extract_start_url(user_description):
     return m.group(0).rstrip('，。；;、,>）)')
 
 
+def _describe_action(a):
+    """把单个探索动作转成「可读中文描述」，供报告展示（如「点击 达人管理」）。
+
+    click/type/upload 优先用执行时补上的 label（元素文字/字段名），
+    否则回退到 ref/url/text；wait 展示等待时长。
+    """
+    action = a.get('action', '')
+    label = (a.get('label') or '').strip()
+
+    if action == 'click':
+        name = label or f'元素(ref={a.get("ref")})'
+        return f'点击 {name}'
+    if action == 'type':
+        name = label or f'输入框(ref={a.get("ref")})'
+        text = a.get('text', '')
+        return f'输入 {name} 为 {text}' if text else f'输入 {name}'
+    if action == 'upload':
+        name = label or '文件'
+        return f'上传 {name}'
+    if action == 'press':
+        name = label or ''
+        key = a.get('key', 'Enter')
+        return f'按键 {name} {key}' if name else f'按键 {key}'
+    if action == 'wait':
+        ms = a.get('ms')
+        if ms is None:
+            try:
+                ms = int(a.get('text'))
+            except (TypeError, ValueError):
+                ms = None
+        secs = f'{ms / 1000:g}秒' if ms else ''
+        return f'等待 {secs}' if secs else '等待'
+    if action == 'goto':
+        return f'打开 {a.get("url", "")}'
+    return action or '操作'
+
+
 def _inject_explore_login(context, target_url):
     """给巡检页面注入登录态（localStorage），避免访问 SSO 站点被重定向到登录页。
 
@@ -153,8 +193,7 @@ def finalize_spec(goal, actions, start_url):
     from .prompts import build_finalize_spec_prompt
 
     actions_text = '\n'.join(
-        f'- {a.get("action")} ref={a.get("ref")} label={a.get("label", "")} text={a.get("text", "")} '
-        f'ms={a.get("ms", "")} url={a.get("url", "")} key={a.get("key", "")}'
+        f'- {_describe_action(a)}'
         for a in actions
     ) or '（无动作）'
     user = f'目标：{goal}\n起始页面：{start_url}\n实际执行成功的动作序列：\n{actions_text}'
@@ -171,11 +210,13 @@ def _empty_result(spec='', error=None, log_path=''):
             'error': error, 'log_path': log_path}
 
 
-def run_explore(user_description, upload_file_path=None):
+def run_explore(user_description, upload_file_path=None, on_progress=None):
     """完整试运行：提取 URL → 自主探索 → 反推规范 → 返回报告。
 
+    :param on_progress: 探索过程中每步关键动作执行后回调 on_progress(text)，用于实时回报进度。
+
     流程（agentic 探索，而不是盲写规范）：
-      1. 从用户描述提取起始 URL，无法提取则报错；
+      1. 从用户描述提取起始 URL，未提供则默认用 DEFAULT_START_URL（基建平台首页）；
       2. 注入巡检账号登录态，goto 起始 URL；
       3. explorer.run_explore_loop 自主探索：AI 观察页面 → 决策 → 执行 → 失败回喂重试；
       4. 探索成功后用真实动作序列反推「节点规范草稿」；失败则返回失败卡点 + 日志路径。
@@ -199,8 +240,8 @@ def run_explore(user_description, upload_file_path=None):
 
     start_url = _extract_start_url(user_description)
     if not start_url:
-        return _empty_result(error='用户描述中未找到页面地址（需含 http:// 或 https:// 开头的 URL）',
-                             log_path=log_path)
+        # 用户没提供 URL 时，默认从巡检基建平台首页开始
+        start_url = DEFAULT_START_URL
 
     # 上传文件路径：优先用调用方传入的，否则回退到模块级常量 UPLOAD_FILE_PATH
     if upload_file_path is None:
@@ -224,7 +265,10 @@ def run_explore(user_description, upload_file_path=None):
             page = context.new_page()
             page.goto(start_url, wait_until='domcontentloaded', timeout=30000)
 
-            success, actions, note = run_explore_loop(page, user_description, upload_file_path=upload_file_path)
+            success, actions, note = run_explore_loop(
+                page, user_description, upload_file_path=upload_file_path, start_url=start_url,
+                on_progress=on_progress,
+            )
 
             # 探索结束后的页面截图
             try:
@@ -250,8 +294,9 @@ def run_explore(user_description, upload_file_path=None):
     for i, a in enumerate(actions, start=1):
         action = a.get('action', '')
         target = a.get('ref') if a.get('ref') is not None else (a.get('url') or a.get('text') or '')
+        desc = _describe_action(a)
         steps_detail.append({
-            'index': i, 'action': action, 'node_title': '', 'node_type': 'step',
+            'index': i, 'action': action, 'node_title': desc, 'node_type': 'step',
             'target': str(target), 'status': 'pass', 'message': '探索执行成功', 'cost_ms': 0,
         })
         passed += 1

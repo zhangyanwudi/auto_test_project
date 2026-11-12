@@ -27,6 +27,7 @@ from contextlib import redirect_stdout
 from apis.server_api.kol_api import KolsysApi,KolEnum
 from base_utils.task_result_base import TaskResultBuilder
 from base_utils.logger_base import setting_logger
+from base_utils.path_base import get_folder_name
 
 
 
@@ -34,7 +35,7 @@ from base_utils.logger_base import setting_logger
 KOL_USER_EMAIL = "zhangyan02195@hungrystudio.com"
 IS_DEBUG = False  # 默认正式环境；手动调试请用命令行 `python ... --debug` 切测试环境，不要改这一行！
 
-logger = setting_logger(__name__)
+logger = setting_logger(get_folder_name(__file__, is_extension=False))
 
 def _env_label():
     """环境标识（延迟到运行时计算，入口处改了 IS_DEBUG 后仍能正确反映）。"""

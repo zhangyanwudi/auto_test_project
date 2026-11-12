@@ -34,7 +34,7 @@
 | 命令 Key | 显示名称 | 参考文件 | 分类 | 说明 |
 |----------|---------|-----------|----|------|
 | `hot-update-test` | 热更测试 | `.claude/references/hot-update-test.md` | 测试 | AB 实验热更调参自动化配置比对测试 |
-| `case-explore` | 生成巡检规范 | `.claude/references/case-explore.md` | 测试 | 生成网页巡检规范并试运行 |
+| `case-explore` | 巡检基建平台 | `.claude/references/case-explore.md` | 测试 | 从基建平台首页开始巡检并试运行 |
 | `command` | 命令列表 | `（当前文件）` | 系统 | 列出所有可用命令 |
 
 ---
@@ -60,7 +60,7 @@
 
 【测试】
   @hot-update-test / @热更测试  — AB 实验热更调参自动化配置比对测试
-  @case-explore / @生成巡检规范  — 生成网页巡检规范并试运行
+  @case-explore / @巡检基建平台  — 从基建平台首页开始巡检并试运行
 
 【系统】
   @command / @commands / @命令  — 显示此命令列表

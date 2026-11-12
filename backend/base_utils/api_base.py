@@ -92,6 +92,32 @@ def get_header(act="json"):
         return str_header
 
 
+def _log_request(method, url, headers=None, **kwargs):
+    """记录请求参数日志：方法 + URL + 请求参数（params/data/json/headers）。
+
+    尽力而为：记录失败时留异常标记（见 _record_log_failure），不影响请求主流程。
+
+    :param method:  请求方法 GET/POST/PUT/DELETE
+    :param url:     请求地址
+    :param headers: 请求头
+    :param kwargs:  请求额外参数（params/data/json/cookies 等）
+    """
+    try:
+        parts = []
+        if kwargs.get("params"):
+            parts.append(f"params:【{_format_body_for_log(kwargs['params'])}】")
+        if kwargs.get("data") is not None:
+            parts.append(f"data:【{_format_body_for_log(kwargs['data'])}】")
+        if kwargs.get("json") is not None:
+            parts.append(f"json:【{_format_body_for_log(kwargs['json'])}】")
+        if headers:
+            parts.append(f"headers:【{_format_body_for_log(headers)}】")
+        detail = " ".join(parts) if parts else "（无请求参数）"
+        logger.debug(f"接口请求参数>>>>>>>【{method}】URL:【{url}】{detail}")
+    except Exception as e:
+        _record_log_failure(e, context=f"{method} URL:【{url}】")
+
+
 def my_get(url, result_control=ResultControl.RESULT, return_format=ReturnFormat.JSON, **kwargs):
     """GET请求。
 
@@ -101,6 +127,7 @@ def my_get(url, result_control=ResultControl.RESULT, return_format=ReturnFormat.
     :return: ApiResult（status/reason/data）
     """
     logger.debug(f"接口请求地址>>>>>>>【{url}】")
+    _log_request("GET", url, **kwargs)
     try:
         resp = requests.request("GET", url, timeout=120, proxies=proxies, **kwargs)
     except Exception as e:
@@ -120,6 +147,7 @@ def my_post(url, result_control=ResultControl.RESULT, return_format=ReturnFormat
     """
     logger.debug(f"接口请求地址>>>>>>>【{url}】")
     headers = headers or {}
+    _log_request("POST", url, headers=headers, **kwargs)
     try:
         resp = requests.request("POST", url, timeout=120, headers=headers, proxies=proxies, **kwargs)
     except Exception as e:
@@ -137,6 +165,7 @@ def my_put(url, result_control=ResultControl.RESULT, return_format=ReturnFormat.
     :return: ApiResult（status/reason/data）
     """
     logger.debug(f"接口请求地址>>>>>>>【{url}】")
+    _log_request("PUT", url, **kwargs)
     try:
         resp = requests.request("PUT", url, timeout=120, proxies=proxies, **kwargs)
     except Exception as e:
@@ -154,6 +183,7 @@ def my_delete(url, result_control=ResultControl.RESULT, return_format=ReturnForm
     :return: ApiResult（status/reason/data）
     """
     logger.debug(f"接口请求地址>>>>>>>【{url}】")
+    _log_request("DELETE", url, **kwargs)
     try:
         resp = requests.request("DELETE", url, timeout=120, proxies=proxies, **kwargs)
     except Exception as e:
@@ -199,6 +229,70 @@ def retry_request(retry_count=3, retry_codes=None, retry_text=None, retry_xpath=
     return decorator
 
 
+def _format_body_for_log(value, max_len=2000):
+    """把返回内容格式化为日志用字符串，超长截断（避免刷爆日志）。
+
+    :param value:   接口返回内容（dict/list/str/其他）
+    :param max_len: 最大保留字符数，超出截断
+    :return: 格式化后的字符串
+    """
+    if isinstance(value, (dict, list)):
+        try:
+            text = json.dumps(value, ensure_ascii=False)
+        except (TypeError, ValueError):
+            text = str(value)
+    elif isinstance(value, str):
+        text = value
+    else:
+        text = str(value)
+
+    if len(text) > max_len:
+        text = text[:max_len] + f"...（截断，总长 {len(text)}）"
+    return text
+
+
+def _record_log_failure(e, context=""):
+    """响应日志记录失败时，尽力留下一条异常标记，方便后续排查。
+
+    本函数自身也做兜底：logger 记录失败则退化为 print，print 失败则放弃，
+    绝不向上抛出，不影响接口返回。
+
+    :param e:       异常对象
+    :param context: 补充上下文说明
+    """
+    msg = f"接口响应日志记录异常（接口已正常返回，仅日志未记录）{context}：{e}"
+    try:
+        logger.error(msg)
+    except Exception:
+        try:
+            # print 兜底：手动拼时间戳，确保即使 logger 故障也能留痕
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+        except Exception:
+            pass
+
+
+def _log_response(resp, return_value, result_control):
+    """记录接口响应日志：状态码 + 最终 URL + 返回内容。
+
+    本方法内部捕获所有异常：日志记录失败时留一条异常标记（见 _record_log_failure），
+    绝不向上抛出，确保不会影响 my_return 的正常返回。
+
+    :param resp:            requests.Response 对象
+    :param return_value:    my_return 处理后的返回值
+    :param result_control:  返回内容控制类型（字符串）
+    """
+    try:
+        # result_control="resp" 返回的是 Response 对象本身，记录状态码与 URL 即可
+        if result_control == "resp":
+            logger.info(f"接口响应>>>>>>>【{resp.status_code}】URL:【{resp.url}】（result_control=resp）")
+            return
+        body = _format_body_for_log(return_value)
+        logger.info(f"接口响应>>>>>>>【{resp.status_code}】URL:【{resp.url}】返回内容:【{body}】")
+    except Exception as e:
+        # 日志记录异常：留下标记，方便以后排查，但不影响主流程
+        _record_log_failure(e)
+
+
 def my_return(resp, result_control=ResultControl.RESULT, return_format=ReturnFormat.JSON):
     """
     请求结果统一封装，返回 ApiResult（状态 + 原因 + 数据）。
@@ -241,6 +335,13 @@ def my_return(resp, result_control=ResultControl.RESULT, return_format=ReturnFor
         reason = f"结果处理异常，异常原因：{e}"
         logger.error(reason)
         return ApiResult.failure(reason=reason)
+
+    # 成功路径：记录响应状态码、最终 URL 与返回内容，便于排查接口返回
+    # 日志记录本身再兜底一层，任何异常都不影响 ApiResult 的正常返回
+    try:
+        _log_response(resp, return_value, result_control)
+    except Exception as e:
+        _record_log_failure(e, context=f"URL:【{getattr(resp, 'url', '未知')}】")
 
     return ApiResult.success(return_value)
 

@@ -740,7 +740,8 @@ class KolsysApi(KolEnum):
             platform = self._share.get_or_fetch(key="experiment_media_platform", fetcher=self.get_experimen_list_data)
         # 不支持该渠道
         if platform in ["Instagram", "VK"]:
-            return True, []
+            return True, ["没有数据是正常的，在列表补个占位"]
+
         payload = {"experiment_code": experiment_code, "media_platform": [platform], "page": 1, "page_size": count}
         status, resp = my_post(url, headers=self.headers, data=json.dumps(payload))
         if not status:
@@ -850,7 +851,7 @@ class KolsysApi(KolEnum):
 
 
 if __name__ == "__main__":
-    kolsys_api = KolsysApi(is_debug=True)
+    kolsys_api = KolsysApi(is_debug=False)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
     # user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
@@ -867,5 +868,7 @@ if __name__ == "__main__":
                               domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
 
-    kolsys_api.business_get_projects_detail()
+    status,resp=kolsys_api.get_create_ad_video_list_data()
+    # from task_file.run_kol_activate_pro import _check_list_has_data
+    # print(_check_list_has_data(status,resp))
 

@@ -315,6 +315,186 @@ def _do_action(page, action, elements, upload_file_path=None):
     raise ExploreError(f'未知动作：{act}')
 
 
+# ── 导航节点分层固化：探索成功后按「模块 → 子功能」固化导航，下次按目标描述匹配回放 ──
+# 场景：达人管理 / 订单管理 是一级菜单（模块），达人管理下的上传达人 / 创建订单 是二级入口（子功能）。
+# 分层固化后，未来可分别回放「只进某模块」或「只进某子功能」。
+# 模块名 = 导航前缀第一个 click 的 label；子功能名 = 第二个 click 的 label（无则等于模块名）。
+# goto 由 runner 每次统一执行，不固化。
+
+# 视为「目标操作」的动作：导航前缀在这里结束，之后是每次目标特有的操作
+_NAV_END_ACTIONS = ('type', 'upload', 'press')
+
+
+def _nav_cache_dir():
+    """导航缓存目录：backend/data/explore_cache。"""
+    from django.conf import settings
+    d = os.path.join(str(settings.BASE_DIR), 'data', 'explore_cache')
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _nav_cache_path():
+    """分层导航缓存文件路径：backend/data/explore_cache/nav_modules.json。"""
+    return os.path.join(_nav_cache_dir(), 'nav_modules.json')
+
+
+def _load_modules_cache():
+    """读取分层导航缓存 {module: {feature: [nav_actions]}}；无则返回空 dict。"""
+    path = _nav_cache_path()
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        explore_logger.warning('读取导航缓存失败 {}：{}', path, e)
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_modules_cache(data):
+    """写回分层导航缓存。"""
+    path = _nav_cache_path()
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        explore_logger.error('导航缓存写入失败 {}：{}', path, e)
+
+
+def save_nav_actions(module_name, feature_name, nav_actions):
+    """按「模块/子功能」固化导航片段。nav_actions 为空时不写（避免误清已有缓存）。"""
+    if not nav_actions or not module_name:
+        return
+    feature_name = feature_name or module_name
+    data = _load_modules_cache()
+    data.setdefault(module_name, {})
+    data[module_name][feature_name] = nav_actions
+    _save_modules_cache(data)
+    explore_logger.info('导航片段已固化：{} / {} → {} 个动作', module_name, feature_name, len(nav_actions))
+
+
+def load_nav_actions(module_name, feature_name=None):
+    """按「模块/子功能」读取已固化的导航片段；命中返回 (nav_actions, module, feature)。
+
+    - 指定 feature_name 时优先精确匹配该子功能；
+    - 未命中子功能时回退到模块级导航（feature=module 的默认入口）；
+    - 都未命中返回 None。
+    """
+    if not module_name:
+        return None
+    data = _load_modules_cache()
+    mod = data.get(module_name)
+    if not isinstance(mod, dict):
+        return None
+    if feature_name and feature_name in mod:
+        return mod[feature_name], module_name, feature_name
+    if module_name in mod:
+        return mod[module_name], module_name, module_name
+    return None
+
+
+def extract_nav_prefix(actions):
+    """从成功探索的动作序列里，提取「固定导航片段」并识别模块/子功能名。
+
+    导航片段 = 从开头连续出现的 click/wait，直到遇到第一个 type/upload/press 为止。
+    只保留可稳定回放的动作：click 需有 label（否则无法按文字定位，导航在此截断）；
+    goto 由 runner 每次统一执行，这里不固化。
+
+    模块名 = 第一个 click 的 label（如「达人管理」）；
+    子功能名 = 第二个 click 的 label（如「上传达人」），没有第二个则等于模块名。
+
+    返回 (module_name, feature_name, nav_actions)。nav_actions 可能为空。
+    """
+    nav = []
+    module_name = ''
+    feature_name = ''
+    for a in actions or []:
+        act = a.get('action')
+        if act in _NAV_END_ACTIONS:
+            break
+        if act == 'click':
+            label = (a.get('label') or '').strip()
+            if not label:
+                break  # 无文字，无法稳定回放，截断
+            nav.append({'action': 'click', 'label': label})
+            if not module_name:
+                module_name = label
+            elif not feature_name:
+                feature_name = label
+        elif act == 'wait':
+            ms = a.get('ms')
+            if ms is None:
+                try:
+                    ms = int(a.get('text'))
+                except (TypeError, ValueError):
+                    ms = 0
+            if ms and ms > 0:
+                nav.append({'action': 'wait', 'ms': ms})
+        # goto 不固化
+    feature_name = feature_name or module_name
+    return module_name, feature_name, nav
+
+
+def _click_by_label(page, label):
+    """按元素文字点击（回放固化导航用，避免依赖每次变化的 ref）。"""
+    loc = page.get_by_text(label, exact=True)
+    if loc.count() == 0:
+        loc = page.get_by_text(label, exact=False)
+    loc.first.click(timeout=10000)
+
+
+def guess_nav_keys(goal):
+    """从目标描述里猜测要执行的「模块/子功能」名，用于匹配分层缓存。
+
+    策略：从 goal 里切出已固化缓存中的模块名/子功能名（精确子串匹配）。
+    返回 (module_name, feature_name)，都未命中返回 (None, None)。
+    """
+    if not goal:
+        return None, None
+    data = _load_modules_cache()
+    matched_module = None
+    for module_name in data:
+        if module_name and module_name in goal:
+            matched_module = module_name
+            break
+    if not matched_module:
+        return None, None
+    matched_feature = None
+    mod = data.get(matched_module) or {}
+    for feature_name in mod:
+        if feature_name and feature_name in goal and feature_name != matched_module:
+            matched_feature = feature_name
+            break
+    return matched_module, matched_feature
+
+
+def replay_nav_actions(page, nav_actions):
+    """回放固化的导航片段。失败抛 ExploreError，由调用方决定是否退化重新探索。"""
+    for a in nav_actions or []:
+        act = a.get('action')
+        if act == 'click':
+            label = a.get('label')
+            if not label:
+                raise ExploreError('导航片段缺少 click label')
+            try:
+                _click_by_label(page, label)
+            except Exception as e:  # noqa: BLE001
+                raise ExploreError(f'回放导航点击「{label}」失败：{e}')
+        elif act == 'wait':
+            try:
+                ms = int(a.get('ms') or 0)
+            except (TypeError, ValueError):
+                ms = 0
+            if ms > 0:
+                page.wait_for_timeout(ms)
+        elif act == 'goto':
+            # 兼容旧缓存里可能含 goto
+            url = a.get('url')
+            if url:
+                page.goto(url, wait_until='domcontentloaded', timeout=30000)
+
+
 def _build_history_text(history):
     """把历史动作/结果序列化成文本给 AI。"""
     if not history:
@@ -328,10 +508,12 @@ def _build_history_text(history):
     return '\n'.join(lines)
 
 
-def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None):
+def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None, start_url=None, on_progress=None):
     """在 page 上执行自主探索循环，直到 AI 声明 done。
 
     :param upload_file_path: 上传类巡检要上传的本地文件绝对路径；为 None 时 AI 无法执行 upload 动作
+    :param start_url:        入口 URL，用于「导航片段」的固化/回放缓存；为 None 时不启用缓存
+    :param on_progress:      每步关键动作执行后回调 on_progress(text)，用于实时回报进度（可为 None）
 
     返回 (success, actions, last_note)：
       - success: bool，是否达成目标
@@ -342,7 +524,32 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None):
 
     system = build_explorer_system_prompt(upload_file_path=upload_file_path)
     history = []
-    performed_actions = []  # 真实走通的完整动作序列
+    performed_actions = []  # 真实走通的完整动作序列（含已回放的导航片段）
+
+    # ── 回放已固化的导航片段（如「点达人管理菜单」），避免每次重复探索同一段导航 ──
+    # 按目标描述猜测模块/子功能，命中分层缓存则回放对应导航。
+    nav_result = None
+    if start_url:
+        module_name, feature_name = guess_nav_keys(goal)
+        nav_result = load_nav_actions(module_name, feature_name) if module_name else None
+    replayed = False
+    if nav_result:
+        nav_actions, _module, _feature = nav_result
+        try:
+            replay_nav_actions(page, nav_actions)
+            replayed = True
+            # 把回放的导航合并进动作序列，反推规范时仍能保留导航步骤
+            performed_actions = list(nav_actions)
+            explore_logger.info('[巡检探索] 已回放固化导航 {}/{}：{} 个动作，跳过重复探索',
+                                _module, _feature, len(nav_actions))
+            try:
+                page.wait_for_timeout(1000)
+            except Exception:  # noqa: BLE001
+                pass
+        except ExploreError as e:
+            explore_logger.warning('[巡检探索] 回放固化导航失败，退化重新探索：{}', e)
+            replayed = False
+            performed_actions = []
 
     explore_logger.info('[巡检探索] 目标={} 开始，最多 {} 轮，上传文件={}', goal, max_rounds, upload_file_path or '（未配置）')
 
@@ -351,11 +558,16 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None):
         observe_text = _format_observe(state)
         history_text = _build_history_text(history)
 
+        nav_hint = ''
+        if replayed:
+            nav_hint = '\n\n（已通过固化导航进入目标页面，请直接从当前页面执行目标操作，不要再重复点击导航菜单。）'
+
         user = (
             f'目标：{goal}\n\n'
             f'—— 第 {round_no} 轮观察 ——\n'
             f'{observe_text}\n\n'
-            f'—— 历史 ——\n{history_text}\n\n'
+            f'—— 历史 ——\n{history_text}\n'
+            f'{nav_hint}\n\n'
             '请根据当前页面与目标，输出下一轮决策 JSON。'
         )
 
@@ -383,6 +595,11 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None):
                 explore_logger.warning('[巡检探索] 第 {} 轮 AI 声明失败：{}', round_no, note)
                 return False, performed_actions, note
             explore_logger.info('[巡检探索] 第 {} 轮 AI 声明完成：{}', round_no, note)
+            # 探索成功 → 从真实动作序列里提取「固定导航前缀 + 模块/子功能名」分层固化，
+            # 供下次按模块/子功能直接回放。回放模式下 AI 不再导航，提取出的前缀为空，不会误覆盖已有缓存。
+            if start_url and not replayed:
+                module_name, feature_name, nav = extract_nav_prefix(performed_actions)
+                save_nav_actions(module_name, feature_name, nav)
             return True, performed_actions, note
 
         actions = decision.get('actions') or []
@@ -393,25 +610,36 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None):
         round_result_parts = []
         round_ok = True
         for act in actions:
+            action_name = act.get('action')
             # 执行前补上 ref 对应的元素文字，反推规范时能给出确定性元素名
-            if act.get('action') in ('click', 'type', 'upload') and act.get('ref') is not None:
+            if action_name in ('click', 'type', 'upload') and act.get('ref') is not None:
                 act['label'] = _ref_label(state.get('elements') or [], act.get('ref'))
             try:
                 result_text = _do_action(page, act, state.get('elements') or [], upload_file_path=upload_file_path)
                 performed_actions.append(act)
                 round_result_parts.append(result_text)
                 explore_logger.info('[巡检探索] 第 {} 轮执行 {} ref={} text={} → 成功',
-                                    round_no, act.get('action'), act.get('ref'), act.get('text', ''))
+                                    round_no, action_name, act.get('ref'), act.get('text', ''))
+                # 关键动作执行成功后实时回报（wait/goto 这类辅助动作不打扰）
+                if on_progress and action_name in ('click', 'type', 'upload'):
+                    from .runner import _describe_action
+                    on_progress(f'✅ {_describe_action(act)}，结果 ✅ 通过')
             except ExploreError as e:
                 round_ok = False
                 round_result_parts.append(f'失败：{e}')
                 explore_logger.warning('[巡检探索] 第 {} 轮执行 {} ref={} 失败：{}',
-                                       round_no, act.get('action'), act.get('ref'), e)
+                                       round_no, action_name, act.get('ref'), e)
+                if on_progress and action_name in ('click', 'type', 'upload'):
+                    from .runner import _describe_action
+                    on_progress(f'❌ {_describe_action(act)}，结果 ❌ 失败：{e}')
             except Exception as e:  # noqa: BLE001
                 round_ok = False
                 round_result_parts.append(f'异常：{e}')
                 explore_logger.error('[巡检探索] 第 {} 轮执行 {} 异常：{}',
-                                     round_no, act.get('action'), e)
+                                     round_no, action_name, e)
+                if on_progress and action_name in ('click', 'type', 'upload'):
+                    from .runner import _describe_action
+                    on_progress(f'❌ {_describe_action(act)}，结果 ❌ 失败：{e}')
 
         history.append({
             'note': note,

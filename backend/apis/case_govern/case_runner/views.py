@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-巡检规范接口：explore（生成规范 + 试运行）、solidify（固化建用例）。
+巡检规范接口：explore（巡检试运行）、solidify（固化建用例）。
 
 - explore：调 case_runner.runner.run_explore，返回「规范草稿 + 每步明细 + 通过/失败」
 - solidify：用户确认后，把规范草稿建成用例（节点树写入 case_govern）
@@ -64,7 +64,7 @@ def _parse_spec_to_nodes(spec_text):
 @require_http_methods(['POST'])
 @require_valid_token
 def case_explore(request):
-    """生成巡检规范 + 试运行。
+    """巡检试运行。
 
     body: { description: "用户对页面和功能的自然语言描述" }
     返回: { spec, steps, passed, failed, total, error }
