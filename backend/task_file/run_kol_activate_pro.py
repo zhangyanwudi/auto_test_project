@@ -355,6 +355,12 @@ def run_kol_activate_pro(only_name=None):
             status, data = case["func"](api)
             logger.info(json.dumps(data))
             ok, detail = case["check"](status, data)
+            # 首次判定因「空数据」失败时，给一次重试机会；仍为空才认为真为空
+            if not ok and status and isinstance(data, (list, dict)) and not data:
+                logger.warning(f"[{i}/{total}] {name} 首次返回空数据，重试一次再判定")
+                status, data = case["func"](api)
+                logger.info(json.dumps(data))
+                ok, detail = case["check"](status, data)
         except Exception as e:  # noqa: BLE001 巡检兜底，单个接口异常不影响汇总
             ok, detail = False, f"执行异常：{e}"
         # 运行消息统一收集到 result（最终体现在页面「成功消息/失败消息」）。

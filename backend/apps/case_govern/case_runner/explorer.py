@@ -394,6 +394,37 @@ def load_nav_actions(module_name, feature_name=None):
     return None
 
 
+def remove_nav_actions(module_name, feature_name=None):
+    """删除某模块/子功能的失效导航缓存，避免每次回放都对坏缓存反复失败。
+
+    指定 feature_name 时只删该子功能；否则删整个模块。
+    """
+    if not module_name:
+        return
+    data = _load_modules_cache()
+    mod = data.get(module_name)
+    if not isinstance(mod, dict):
+        return
+
+    if feature_name:
+        # 删指定子功能；删空后若该模块已无任何功能，则整个模块一并删掉
+        if feature_name in mod:
+            del mod[feature_name]
+            if not mod:
+                del data[module_name]
+        else:
+            return
+    else:
+        # 删整个模块
+        if module_name in data:
+            del data[module_name]
+        else:
+            return
+
+    _save_modules_cache(data)
+    explore_logger.info('已清除失效导航缓存：{} / {}', module_name, feature_name or '（整模块）')
+
+
 def extract_nav_prefix(actions):
     """从成功探索的动作序列里，提取「固定导航片段」并识别模块/子功能名。
 
@@ -437,10 +468,17 @@ def extract_nav_prefix(actions):
 
 
 def _click_by_label(page, label):
-    """按元素文字点击（回放固化导航用，避免依赖每次变化的 ref）。"""
+    """按元素文字点击（回放固化导航用，避免依赖每次变化的 ref）。
+
+    加固点：优先精确匹配（exact=True），精确匹配不到时才用包含匹配，
+    且两个都找不到时直接抛错（而不是静默点空）。是否「点错/没到位」由
+    replay_nav_actions 回放后统一校验兜底。
+    """
     loc = page.get_by_text(label, exact=True)
     if loc.count() == 0:
         loc = page.get_by_text(label, exact=False)
+    if loc.count() == 0:
+        raise ExploreError(f'页面上找不到文字「{label}」')
     loc.first.click(timeout=10000)
 
 
@@ -469,8 +507,13 @@ def guess_nav_keys(goal):
     return matched_module, matched_feature
 
 
-def replay_nav_actions(page, nav_actions):
-    """回放固化的导航片段。失败抛 ExploreError，由调用方决定是否退化重新探索。"""
+def replay_nav_actions(page, nav_actions, expected_label=None):
+    """回放固化的导航片段。失败抛 ExploreError，由调用方决定是否退化重新探索。
+
+    :param expected_label: 期望最终到达的节点名（通常为模块名或子功能名），
+                           回放完成后校验页面可见文本是否包含它，包含才算真的到位。
+    """
+    last_click_label = ''
     for a in nav_actions or []:
         act = a.get('action')
         if act == 'click':
@@ -479,6 +522,7 @@ def replay_nav_actions(page, nav_actions):
                 raise ExploreError('导航片段缺少 click label')
             try:
                 _click_by_label(page, label)
+                last_click_label = label
             except Exception as e:  # noqa: BLE001
                 raise ExploreError(f'回放导航点击「{label}」失败：{e}')
         elif act == 'wait':
@@ -493,6 +537,18 @@ def replay_nav_actions(page, nav_actions):
             url = a.get('url')
             if url:
                 page.goto(url, wait_until='domcontentloaded', timeout=30000)
+
+    # 回放后校验是否真的到位：页面可见文本应包含目标节点名（菜单点击后通常页面会渲染该模块标题/菜单）。
+    # 校验失败说明「点错或没跳转」，抛错交由上层退化重新探索，避免在错误页面瞎操作。
+    check_label = expected_label or last_click_label
+    if check_label:
+        try:
+            page.wait_for_timeout(800)
+            visible = page.inner_text('body') or ''
+        except Exception as e:  # noqa: BLE001
+            raise ExploreError(f'回放后校验页面失败：{e}')
+        if check_label not in visible:
+            raise ExploreError(f'回放后未进入目标节点「{check_label}」，页面未出现该文字，疑似点错')
 
 
 def _build_history_text(history):
@@ -536,7 +592,8 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None, start_url
     if nav_result:
         nav_actions, _module, _feature = nav_result
         try:
-            replay_nav_actions(page, nav_actions)
+            # 回放后校验是否真的进入了目标节点（模块/子功能），点错或没跳转会抛错
+            replay_nav_actions(page, nav_actions, expected_label=(_feature if _feature != _module else _module))
             replayed = True
             # 把回放的导航合并进动作序列，反推规范时仍能保留导航步骤
             performed_actions = list(nav_actions)
@@ -548,6 +605,8 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None, start_url
                 pass
         except ExploreError as e:
             explore_logger.warning('[巡检探索] 回放固化导航失败，退化重新探索：{}', e)
+            # 回放失败 → 该条缓存已失效，清除后下次重新探索并重新固化
+            remove_nav_actions(_module, _feature if _feature != _module else None)
             replayed = False
             performed_actions = []
 
