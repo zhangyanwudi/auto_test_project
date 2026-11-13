@@ -531,6 +531,61 @@ def guess_module_from_goal(goal):
     return None
 
 
+def parse_goal_hierarchy(goal):
+    """从目标描述里解析出「模块 → 子功能 → 功能点」三层结构，用于固化时按模块分层建节点树。
+
+    解析策略：
+      1. 优先按分隔符（-- / — / → / -）切分，形如「达人管理--上传达人--批量上传」；
+      2. 无分隔符时，用关键词识别模块（一级菜单名）与子功能/功能点。
+
+    返回 dict: {'module': str|None, 'feature': str|None, 'action': str|None}。
+    """
+    if not goal:
+        return {'module': None, 'feature': None, 'action': None}
+
+    module = guess_module_from_goal(goal)
+
+    # ── 关键词定位：feature=二级入口（如「上传达人」），action=三级操作点（如「批量上传」）──
+    # feature 关键词（二级入口，通常是「达人之下的功能页」）
+    feature_keywords = ['上传达人', '创建订单', '导入达人', '批量导入', '单个导入', '导入']
+    # action 关键词（三级操作点，feature 下的具体操作）
+    action_keywords = ['批量上传', '单个上传', '批量导入', '单个导入', '创建订单', '提交']
+
+    feature = None
+    action = None
+
+    # 先找 feature（二级入口），再在其后文本里找 action（三级点）
+    for kw in feature_keywords:
+        idx = goal.find(kw)
+        if idx >= 0:
+            if feature is None or idx < goal.find(feature):
+                feature = kw
+    if feature:
+        # 在 feature 出现位置之后找 action
+        after = goal[goal.find(feature) + len(feature):]
+        for kw in action_keywords:
+            if kw in after and kw != feature:
+                action = kw
+                break
+        if action is None:
+            # 整个 goal 里兜底找 action（排除与 feature 相同的词）
+            for kw in action_keywords:
+                if kw in goal and kw != feature:
+                    action = kw
+                    break
+    else:
+        # 无 feature 时，用 action 关键词兜底
+        for kw in action_keywords:
+            if kw in goal:
+                action = kw
+                break
+        if action:
+            feature = action
+            action = None
+
+    return {'module': module, 'feature': feature, 'action': action}
+
+
 def replay_nav_actions(page, nav_actions, expected_label=None):
     """回放固化的导航片段。失败抛 ExploreError，由调用方决定是否退化重新探索。
 

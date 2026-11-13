@@ -81,14 +81,24 @@ def case_explore(request):
     return _ok(result)
 
 
-def _do_solidify(case_name, spec, creator=''):
-    """把规范草稿固化为用例：建主表 + 节点树（precondition/step/result）。
+def _do_solidify(case_name, spec, creator='', goal=None):
+    """把规范草稿固化为用例：建主表 + 按「模块 → 子功能 → 功能点」分层建节点树。
+
+    节点树结构（precondition 挂根下，step/result 挂最底层功能点下）：
+      根（module=用例名「巡检基建平台」）
+        ├─ precondition（前置条件，页面地址）
+        └─ 模块（如「达人管理」，node_type=case）
+            └─ 子功能（如「上传达人」，node_type=case）
+                └─ 功能点（如「批量上传」，node_type=case）
+                    ├─ step × N
+                    └─ result × M
 
     供 case_solidify 接口与 AI 助手「确认固化」共用。
 
     :param case_name: 用例名称
     :param spec:      规范草稿文本（含【precondition】/【step】/【result】三段）
     :param creator:   创建人（用户中文名或用户名）
+    :param goal:      目标描述（用于解析模块/子功能/功能点层级；为空则退化为平铺）
     :return: (ok, data|error_msg)。ok 为 True 时 data 为 {'id': ..., 'case_name': ...}。
     """
     case_name = (case_name or '').strip()
@@ -100,13 +110,44 @@ def _do_solidify(case_name, spec, creator=''):
     if not nodes['precondition']:
         return False, '规范草稿中未提取到页面地址，无法固化'
 
-    # 构建节点树：根（module=用例名） → 前置（precondition） → 步骤（step） → 结果（result）
-    children = []
-    children.append({'title': nodes['precondition'], 'node_type': 'precondition', 'children': []})
-    for s in nodes['steps']:
-        children.append({'title': s, 'node_type': 'step', 'children': []})
-    for r in nodes['results']:
-        children.append({'title': r, 'node_type': 'result', 'children': []})
+    # 步骤/结果叶子节点
+    step_nodes = [{'title': s, 'node_type': 'step', 'children': []} for s in nodes['steps']]
+    result_nodes = [{'title': r, 'node_type': 'result', 'children': []} for r in nodes['results']]
+
+    # 从目标描述解析层级：模块 → 子功能 → 功能点
+    hierarchy = {'module': None, 'feature': None, 'action': None}
+    if goal:
+        from apps.case_govern.case_runner.explorer import parse_goal_hierarchy
+        hierarchy = parse_goal_hierarchy(goal)
+
+    # 把 step/result 挂到最底层功能点下；若没有功能点则挂到子功能；再没有则挂到模块；再没有则平铺挂根
+    leaf_children = step_nodes + result_nodes
+
+    action_children = []
+    if hierarchy.get('action'):
+        action_children = [{'title': hierarchy['action'], 'node_type': 'case', 'children': leaf_children}]
+    elif hierarchy.get('feature'):
+        action_children = leaf_children
+    else:
+        action_children = leaf_children
+
+    feature_children = []
+    if hierarchy.get('feature'):
+        feature_children = [{'title': hierarchy['feature'], 'node_type': 'case', 'children': action_children}]
+    elif hierarchy.get('action'):
+        feature_children = action_children
+    else:
+        feature_children = action_children
+
+    module_children = []
+    if hierarchy.get('module'):
+        module_children = [{'title': hierarchy['module'], 'node_type': 'case', 'children': feature_children}]
+    else:
+        module_children = feature_children
+
+    # 根 children：前置条件 + 模块层级
+    root_children = [{'title': nodes['precondition'], 'node_type': 'precondition', 'children': []}]
+    root_children.extend(module_children)
 
     tree = {
         'id': None,
@@ -116,7 +157,7 @@ def _do_solidify(case_name, spec, creator=''):
         'exec_result': '',
         'collapsed': False,
         'image': '',
-        'children': children,
+        'children': root_children,
     }
 
     from apis.case_govern.views import _normalize_node, _sync_case_nodes

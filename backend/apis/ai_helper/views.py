@@ -733,10 +733,13 @@ def _try_solidify_from_conversation(user, conv):
     spec_text = match.group(0) if match else spec
     spec_text = re.split(r'🧪\s*试运行结果|🔍\s*探索日志|👉\s*回复', spec_text)[0].rstrip()
 
-    case_name = (conv.title or '').strip() or '巡检用例'
+    # 用例名固定为「巡检基建平台」；目标描述取对话里第一条用户消息（用于解析模块/子功能/功能点层级）
+    case_name = '巡检基建平台'
+    first_user = AiMessage.objects.filter(conversation=conv, role='user').order_by('id').first()
+    goal = (first_user.content or '') if first_user else ''
 
     from apis.case_govern.case_runner.views import _do_solidify
-    return _do_solidify(case_name, spec_text, creator=(user.user_cn_name or user.user_name))
+    return _do_solidify(case_name, spec_text, creator=(user.user_cn_name or user.user_name), goal=goal)
 
 
 @csrf_exempt
