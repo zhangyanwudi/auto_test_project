@@ -8,6 +8,7 @@ AI助手 API 接口层：对话列表、创建/删除对话、发送消息、文
 import json
 import logging
 import os
+import threading
 import uuid
 
 import openpyxl
@@ -987,11 +988,28 @@ def chat(request):
             try:
                 from apps.case_govern.case_runner.runner import run_explore
 
-                # 进度回报：把每步关键动作落库成 assistant 消息，前端轮询即可实时看到卡在哪一步
-                def _progress(text):
-                    save_assistant_message(conv, text)
+                # 进度回报：把每步关键动作落库成 assistant 消息，前端轮询即可实时看到卡在哪一步。
+                # 注意：run_explore 在 sync_playwright 的事件循环内执行回调，此时 Django 同步 ORM
+                # 会抛 SynchronousOnlyOperation（"async context"），因此落库必须放到独立线程，
+                # 并 close 主线程连接、在线程内新建独立连接，绕开 async context 检测。
+                def _save_progress_in_thread(conversation_id, text):
+                    def _do():
+                        from django.db import connection
+                        connection.close()
+                        try:
+                            AiMessage.objects.create(
+                                conversation_id=conversation_id, role='assistant', content=text
+                            )
+                        finally:
+                            connection.close()
+                    t = threading.Thread(target=_do, daemon=True)
+                    t.start()
+                    t.join(timeout=5)
 
-                save_assistant_message(conv, '🔍 开始巡检，正在探索页面…')
+                def _progress(text):
+                    _save_progress_in_thread(conv.id, text)
+
+                _save_progress_in_thread(conv.id, '🔍 开始巡检，正在探索页面…')
                 explore_result = run_explore(description, on_progress=_progress)
                 reply = _format_case_explore_report(explore_result)
                 logger.info('巡检试运行完成: passed=%s failed=%s',
