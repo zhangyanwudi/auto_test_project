@@ -119,18 +119,25 @@ def _do_solidify(case_name, spec, creator=''):
         'children': children,
     }
 
-    from apps.case_govern.views import _normalize_node, _sync_case_nodes
+    from apis.case_govern.views import _normalize_node, _sync_case_nodes
     from django.db import transaction
 
-    case = ZCaseGovernCase.objects.create(
+    # 同名用例（case_name + module 唯一）已存在时，更新其节点树（幂等），而不是新建报唯一约束冲突。
+    case, _created = ZCaseGovernCase.objects.get_or_create(
         case_name=case_name,
         module='',
-        priority=2,
-        status=1,
-        creator=creator,
-        description='',
-        image='',
+        defaults={
+            'priority': 2,
+            'status': 1,
+            'creator': creator,
+            'description': '',
+            'image': '',
+        },
     )
+    if not _created and creator:
+        case.creator = creator
+        case.save(update_fields=['creator'])
+
     with transaction.atomic():
         _sync_case_nodes(case.id, _normalize_node(tree))
 

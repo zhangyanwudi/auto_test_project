@@ -689,9 +689,6 @@ def _format_case_explore_report(result):
             lines.append(f'🔍 排查日志：{log_path}')
         return '\n'.join(lines)
 
-    lines.append('📋 巡检规范草稿')
-    lines.append(spec)
-    lines.append('')
     lines.append(f'🧪 试运行结果：通过 {passed} / 失败 {failed} / 共 {total} 步')
     lines.append('')
     for s in steps:
@@ -729,10 +726,12 @@ def _try_solidify_from_conversation(user, conv):
     if '【precondition】' not in spec or ('【step】' not in spec and '【result】' not in spec):
         return False, '最近一条回复里没有完整的巡检规范草稿（缺少 precondition/step/result）'
 
-    # 去掉报告里的「📋 巡检规范草稿」「🧪 试运行结果」等排版前缀，仅保留规范文本
-    # （若 assistant 消息里只有规范草稿，则原样使用）
+    # 去掉报告里的「📋 巡检规范草稿」「🧪 试运行结果」等排版前后缀，仅保留规范文本。
+    # 从【precondition】开始，到「🧪 试运行结果」「🔍 探索日志」「👉 回复」等报告尾缀之前结束，
+    # 避免把「试运行结果/日志/提示」误当成 result 节点。
     match = re.search(r'【precondition】.*', spec, re.DOTALL)
     spec_text = match.group(0) if match else spec
+    spec_text = re.split(r'🧪\s*试运行结果|🔍\s*探索日志|👉\s*回复', spec_text)[0].rstrip()
 
     case_name = (conv.title or '').strip() or '巡检用例'
 
@@ -799,9 +798,10 @@ def chat(request):
     #    不以 @ 开头的消息（如回复行号"20"）则保留完整历史上下文。
     is_at_command = message.startswith('@')
 
-    # 6.1 「确认固化」：用户回复该词时，把对话里最新的巡检规范草稿固化为用例。
-    #     不走 AI 网关，直接本地解析 + 建树，避免额外的网关调用。
-    if not is_at_command and message.strip() in ('确认固化', '确认固化为用例', '确认保存'):
+    # 6.1 「确认固化」：用户回复「确认固化」「回复 确认固化」等含「固化」字样时，
+    #     把对话里最新的巡检规范草稿固化为用例。不走 AI 网关，直接本地解析 + 建树。
+    #     用「包含『固化』」判断（而非精确匹配），兼容「回复固化」「确认固化xxx」等输入。
+    if not is_at_command and ('固化' in message or message.strip() == '确认保存'):
         ok, result = _try_solidify_from_conversation(user, conv)
         if ok:
             reply = f'✅ 已固化用例「{result["case_name"]}」（ID={result["id"]}）'

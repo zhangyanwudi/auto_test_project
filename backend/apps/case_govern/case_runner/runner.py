@@ -287,11 +287,21 @@ def run_explore(user_description, upload_file_path=None, on_progress=None):
         explore_logger.error('[巡检探索] 执行器异常：{}', e)
         return _empty_result(error=f'执行器异常：{e}', log_path=log_path)
 
-    # 把探索动作整理成每步明细（供报告展示，页面只显示最终结果）
+    # 把探索动作整理成每步明细（供报告展示，页面只显示最终结果）。
+    # 注意：run_explore_loop 的 actions 不含「打开网页」这步（goto 由本函数执行），
+    # 这里在开头补一条「打开 <start_url>」，让完整链路（打开网页→点菜单→目标操作）可读。
     steps_detail = []
     passed = 0
     failed = 0
-    for i, a in enumerate(actions, start=1):
+
+    # 第一步：打开起始页面
+    steps_detail.append({
+        'index': 1, 'action': 'goto', 'node_title': f'打开 {start_url}', 'node_type': 'step',
+        'target': start_url, 'status': 'pass', 'message': '探索执行成功', 'cost_ms': 0,
+    })
+    passed += 1
+
+    for i, a in enumerate(actions, start=2):
         action = a.get('action', '')
         target = a.get('ref') if a.get('ref') is not None else (a.get('url') or a.get('text') or '')
         desc = _describe_action(a)

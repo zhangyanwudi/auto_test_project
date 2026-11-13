@@ -507,6 +507,30 @@ def guess_nav_keys(goal):
     return matched_module, matched_feature
 
 
+# 基建平台一级菜单关键词 → 菜单名（用于从目标描述里识别要先点哪个菜单进入）
+_MODULE_MENU_KEYWORDS = {
+    '达人管理': ['达人管理', '达人'],
+    '订单管理': ['订单管理', '订单'],
+    '建联管理': ['建联'],
+    '投流管理': ['投流'],
+    '线索库': ['线索'],
+}
+
+
+def guess_module_from_goal(goal):
+    """从目标描述里识别要进入的一级菜单名（如「达人管理」）。
+
+    命中 _MODULE_MENU_KEYWORDS 里的关键词即返回菜单名；未命中返回 None。
+    用于探索时提示 AI 先点对应菜单，确保完整导航链路被探索/固化。
+    """
+    if not goal:
+        return None
+    for menu_name, keywords in _MODULE_MENU_KEYWORDS.items():
+        if any(k in goal for k in keywords):
+            return menu_name
+    return None
+
+
 def replay_nav_actions(page, nav_actions, expected_label=None):
     """回放固化的导航片段。失败抛 ExploreError，由调用方决定是否退化重新探索。
 
@@ -620,6 +644,12 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None, start_url
         nav_hint = ''
         if replayed:
             nav_hint = '\n\n（已通过固化导航进入目标页面，请直接从当前页面执行目标操作，不要再重复点击导航菜单。）'
+        elif round_no == 1:
+            # 首次探索且无缓存：若目标含模块名（如「达人管理」），提示 AI 先点对应菜单进入，
+            # 确保完整导航链路（打开网页 → 点菜单 → 目标操作）被探索并固化。
+            menu = guess_module_from_goal(goal)
+            if menu:
+                nav_hint = f'\n\n（请先点击「{menu}」菜单进入对应模块，再执行目标里的具体操作。）'
 
         user = (
             f'目标：{goal}\n\n'
