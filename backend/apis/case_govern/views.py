@@ -529,7 +529,12 @@ def case_mind_save(request, pk):
         # 保存节点后同步刷新用例主表更新时间（auto_now 自动置为当前时间）
         case.save(update_fields=['update_time'])
 
-    return JsonResponse({'code': 0, 'message': '用例已保存', 'data': {'version': case.update_time.isoformat() if case.update_time else ''}})
+    # 返回落库后的完整树（含服务端分配的节点 id），供前端回写 id、更新合并基准
+    server_tree = _fetch_tree_with_ids(pk, case.case_name)
+    return JsonResponse({'code': 0, 'message': '用例已保存', 'data': {
+        'version': case.update_time.isoformat() if case.update_time else '',
+        'tree': server_tree,
+    }})
 
 
 @csrf_exempt

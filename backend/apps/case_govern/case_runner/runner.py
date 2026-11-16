@@ -37,7 +37,7 @@ def _gen_unique_name():
     return 'auto_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
 
-def _prepare_upload_file(template_path):
+def _prepare_upload_file(template_path, unique_name=None):
     """准备上传文件：把模板里的 {{user_name}} 替换成唯一名，生成唯一副本。
 
     - 模板含 UPLOAD_FILE_REPLACE_VAR 占位符 → 替换成唯一名，副本存到模板同目录 generated/ 下；
@@ -63,7 +63,7 @@ def _prepare_upload_file(template_path):
         if not has_var:
             return True, abs_template
 
-        unique_name = _gen_unique_name()
+        unique_name = unique_name or _gen_unique_name()
         for ws in wb.worksheets:
             for row in ws.iter_rows():
                 for c in row:
@@ -238,19 +238,24 @@ def run_explore(user_description, upload_file_path=None, on_progress=None):
     from base_utils.logger_base import _log_dir
     log_path = os.path.join(_log_dir, f'case_explore_{datetime.now():%Y-%m-%d}.log')
 
-    start_url = _extract_start_url(user_description)
-    if not start_url:
-        # 用户没提供 URL 时，默认从巡检基建平台首页开始
-        start_url = DEFAULT_START_URL
+    # 起始页固定为巡检基建平台首页；描述里的链接是录入数据（如平台账号），不作为起始页
+    start_url = DEFAULT_START_URL
 
     # 上传文件路径：优先用调用方传入的，否则回退到模块级常量 UPLOAD_FILE_PATH
     if upload_file_path is None:
         upload_file_path = UPLOAD_FILE_PATH
     upload_file_path = (upload_file_path or '').strip()
 
+    # 本次运行的唯一标识：目标里的 {{user_name}} 与上传模板共用同一个值，
+    # 保证「录入的链接/邮箱」「上传的数据」「列表里的数据」是同一批记录，便于校验是不是本次生成的
+    unique_marker = None
+    if '{{user_name}}' in user_description:
+        unique_marker = _gen_unique_name()
+        user_description = user_description.replace('{{user_name}}', unique_marker)
+
     # 若指定了模板，每次执行前替换 {{user_name}} 为唯一名，生成唯一副本再上传
     if upload_file_path:
-        ok, prepared = _prepare_upload_file(upload_file_path)
+        ok, prepared = _prepare_upload_file(upload_file_path, unique_name=unique_marker)
         if not ok:
             return _empty_result(error=prepared, log_path=log_path)
         upload_file_path = prepared
@@ -267,6 +272,7 @@ def run_explore(user_description, upload_file_path=None, on_progress=None):
 
             success, actions, note = run_explore_loop(
                 page, user_description, upload_file_path=upload_file_path, start_url=start_url,
+                unique_marker=unique_marker,
                 on_progress=on_progress,
             )
 

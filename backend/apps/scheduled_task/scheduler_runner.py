@@ -131,6 +131,16 @@ def run_forever(reload_interval: int = 60):
     if reload_interval < 10:
         reload_interval = 10
 
+    # 启动时清理残留的「运行中」标记：上一次进程若在任务执行中途退出（重启/reload/被杀），
+    # finally 不会执行，is_running 会一直为 1，导致后续任务全部被跳过。
+    # 调度进程启动时不可能有合法的执行线程仍在跑，因此可安全清零。
+    try:
+        stale = ZScheduledTask.objects.filter(is_running=True).update(is_running=False)
+        if stale:
+            logger.warning('启动时清理残留运行标记：%s 条', stale)
+    except Exception:
+        logger.exception('启动时清理残留运行标记失败')
+
     scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
     sync_jobs(scheduler)
     scheduler.add_job(

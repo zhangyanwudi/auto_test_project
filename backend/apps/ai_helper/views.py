@@ -1632,7 +1632,7 @@ def parse_tool_call(reply_text):
         tuple[str | None, dict | None] — (工具名称, 参数字典)
         如果没有找到工具调用则返回 (None, None)
     """
-    pattern = r'\[TOOL_CALL:(\w+)\]\s*(\{[^}]*\})\s*\[/TOOL_CALL\]'
+    pattern = r'\[TOOL_CALL:(\w+)\]\s*(\{.*?\})\s*\[/TOOL_CALL\]'
     match = re.search(pattern, reply_text, re.DOTALL)
     if not match:
         return None, None
@@ -1656,7 +1656,7 @@ def parse_all_tool_calls(reply_text):
         list[tuple[str, dict]] — [(工具名称, 参数字典), ...]
         如果没有找到任何工具调用则返回空列表 []
     """
-    pattern = r'\[TOOL_CALL:(\w+)\]\s*(\{[^}]*\})\s*\[/TOOL_CALL\]'
+    pattern = r'\[TOOL_CALL:(\w+)\]\s*(\{.*?\})\s*\[/TOOL_CALL\]'
     results = []
     for match in re.finditer(pattern, reply_text, re.DOTALL):
         tool_name = match.group(1)
@@ -1678,5 +1678,5 @@ def remove_tool_call_from_reply(reply_text):
     返回:
         str — 移除 TOOL_CALL 后的文本
     """
-    pattern = r'\n?\[TOOL_CALL:\w+\]\s*\{[^}]*\}\s*\[/TOOL_CALL\]'
-    return re.sub(pattern, '', reply_text).strip()
+    pattern = r'\n?\[TOOL_CALL:\w+\]\s*\{.*?\}\s*\[/TOOL_CALL\]'
+    return re.sub(pattern, '', reply_text, flags=re.DOTALL).strip()

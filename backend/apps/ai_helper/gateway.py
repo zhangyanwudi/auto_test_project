@@ -18,6 +18,7 @@ def load_config():
         'gateway_url': cfg.get('gateway_url', ''),
         'api_key': cfg.get('api_key', ''),
         'model': cfg.get('model', ''),
+        'explore_model': cfg.get('explore_model', ''),
         'max_tokens': int(cfg.get('max_tokens', 4096)),
         'temperature': float(cfg.get('temperature', 0.7)),
         'timeout_seconds': int(cfg.get('timeout_seconds', 60)),
@@ -71,7 +72,7 @@ def extract_reply(response_data):
     return str(response_data)
 
 
-def call_agent_gateway(messages):
+def call_agent_gateway(messages, model=None):
     """
     调用智能体网关发送消息并返回 AI 回复文本。
 
@@ -90,6 +91,8 @@ def call_agent_gateway(messages):
     if not config['api_key']:
         raise RuntimeError('未配置智能体网关密钥，请检查 config/ai_helper_config.json 中的 api_key')
 
+    if model:
+        config['model'] = model  # 单次调用指定模型（如探索需要视觉模型），不影响其它功能
     body = build_request_body(messages, config)
     headers = {
         'Content-Type': 'application/json',

@@ -278,3 +278,43 @@ export function mergeTrees(base, server, mine) {
   const finalRoot = root || cloneNode(server || mine || base || { title: '', children: [] })
   return { mergedTree: finalRoot, conflicts }
 }
+
+/**
+ * 服务端会把「无标题且无图片」的节点标题归一为「未命名」，比较内容时需同样归一。
+ */
+function normalizedTitle(n) {
+  return (!n.title && !n.image) ? '未命名' : (n.title || '')
+}
+
+/**
+ * 两棵树内容是否一致（忽略节点 id，子节点按顺序递归比较）。
+ * 用于判断「服务端树是否就是本地刚提交的内容」（如响应丢失后自己的提交已落库）。
+ */
+export function treeContentEqual(a, b) {
+  if (!a || !b) return a === b
+  if (normalizedTitle(a) !== normalizedTitle(b)) return false
+  if (!fieldsEqual({ ...a, title: normalizedTitle(a) }, { ...b, title: normalizedTitle(b) })) return false
+  const ac = a.children || []
+  const bc = b.children || []
+  if (ac.length !== bc.length) return false
+  return ac.every((c, i) => treeContentEqual(c, bc[i]))
+}
+
+/** 按先序收集节点，用于按位置对齐两棵内容一致的树。 */
+export function collectNodes(node, out = []) {
+  if (!node) return out
+  out.push(node)
+  ;(node.children || []).forEach((c) => collectNodes(c, out))
+  return out
+}
+
+/**
+ * 把服务端分配的 id 回写到本地节点。
+ * liveNodes 与 serverNodes 必须是同一棵树（内容一致）的先序列表，由调用方保证。
+ */
+export function applyServerIds(liveNodes, serverNodes) {
+  const n = Math.min(liveNodes.length, serverNodes.length)
+  for (let i = 0; i < n; i += 1) {
+    if (serverNodes[i].id != null) liveNodes[i].id = serverNodes[i].id
+  }
+}

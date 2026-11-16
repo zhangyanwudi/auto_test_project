@@ -164,7 +164,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted, provide, nextTi
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bottom, Delete } from '@element-plus/icons-vue'
 import { fetchMindTree, saveMindTree, updateNodeExecResult } from '../../api/case_govern/caseGovern.js'
-import { mergeTrees } from './mergeUtils.js'
+import { mergeTrees, treeContentEqual, collectNodes, applyServerIds } from './mergeUtils.js'
 import MindNode from './MindNode.vue'
 
 const NODE_TYPES = [
@@ -752,17 +752,23 @@ async function doSave(silent = false, baseVersion) {
   // baseVersion：本次提交用的乐观锁版本号；缺省用全局 version.value。
   // 合并重存时须显式传入「服务器最新 version」，否则仍带旧 version 会再次 409。
   const submitVersion = baseVersion != null ? baseVersion : version.value
+  // 提交瞬间的快照：sent 为提交内容，liveAtSend 为对应的本地节点（先序，与 sent 位置一一对应）
+  const sent = serializeNode(tree)
+  const liveAtSend = collectNodes(tree)
   try {
-    const res = await saveMindTree(props.caseId, serializeNode(tree), submitVersion)
+    const res = await saveMindTree(props.caseId, sent, submitVersion)
     if (res.code === 0) {
       // 保存成功后更新本地乐观锁版本号（后端返回了最新 version）
       if (res.data && res.data.version) {
         version.value = res.data.version
       }
+      // 回写服务端分配的 id，并更新三方合并基准，避免后续保存把已落库节点当成新节点
+      adoptSavedTree(sent, liveAtSend, res.data && res.data.tree)
       if (silent !== true) {
         ElMessage.success(res.message || '用例已保存')
       }
-      dirty.value = false
+      // 提交期间若用户又改了内容，保持未保存状态，等待下一次保存
+      dirty.value = !treeContentEqual(sent, serializeNode(tree))
       deletedStack.value = []
       emit('dirty-change', false)
       emit('saved')
@@ -780,6 +786,16 @@ async function doSave(silent = false, baseVersion) {
   }
 }
 
+/**
+ * 保存成功后采用服务端树：内容一致时回写 id，并把三方合并基准更新为服务端树。
+ * 内容不一致（无法可靠对齐）时不做处理，保留原状。
+ */
+function adoptSavedTree(sent, liveNodes, serverTree) {
+  if (!serverTree || !treeContentEqual(sent, serverTree)) return
+  applyServerIds(liveNodes, collectNodes(serverTree))
+  baseSnapshot.value = JSON.parse(JSON.stringify(serverTree))
+}
+
 /** 处理保存冲突：三方合并，冲突节点弹列表让用户逐条选择 */
 async function handleMergeConflict(res, latestVersion = '') {
   const serverTree = res.data?.server_tree
@@ -791,6 +807,17 @@ async function handleMergeConflict(res, latestVersion = '') {
   const base = baseSnapshot.value
   const mine = serializeNode(tree)
   const server = serverTree
+
+  // 自冲突：服务端内容与本地完全一致，通常是上一次保存的响应丢失但已落库。
+  // 此时不应合并（否则会把同一批节点当成「双方新增」而重复），只需采用服务端 id 与版本号。
+  if (treeContentEqual(mine, server)) {
+    applyServerIds(collectNodes(tree), collectNodes(server))
+    baseSnapshot.value = JSON.parse(JSON.stringify(server))
+    if (latestVersion) version.value = latestVersion
+    dirty.value = false
+    emit('dirty-change', false)
+    return
+  }
 
   const { mergedTree, conflicts } = mergeTrees(base, server, mine)
 
