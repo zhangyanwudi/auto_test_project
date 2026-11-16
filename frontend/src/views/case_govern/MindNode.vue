@@ -71,7 +71,7 @@
     <div v-if="hasChildren && !node.collapsed" class="tkids">
       <MindNode
         v-for="child in node.children"
-        :key="child.id"
+        :key="child._k ?? child.id"
         :node="child"
         :selected-id="selectedId"
         :editing-id="editingId"

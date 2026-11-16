@@ -318,3 +318,19 @@ export function applyServerIds(liveNodes, serverNodes) {
     if (serverNodes[i].id != null) liveNodes[i].id = serverNodes[i].id
   }
 }
+
+/**
+ * 为节点补齐渲染用的稳定 key（_k），递归处理整棵树，已有 _k 的节点保持不变。
+ * _k 与数据库 id 解耦：保存后服务端回写数字 id 不会改变 _k，节点组件不会被重建，编辑焦点不丢失。
+ * _k 不参与序列化（serializeNode 不输出）与合并比较。
+ */
+let keySeq = 0
+export function ensureNodeKeys(node) {
+  if (!node) return node
+  if (node._k == null) {
+    keySeq += 1
+    node._k = `k${keySeq}`
+  }
+  ;(node.children || []).forEach(ensureNodeKeys)
+  return node
+}

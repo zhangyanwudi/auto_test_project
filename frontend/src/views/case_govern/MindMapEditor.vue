@@ -164,7 +164,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted, provide, nextTi
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bottom, Delete } from '@element-plus/icons-vue'
 import { fetchMindTree, saveMindTree, updateNodeExecResult } from '../../api/case_govern/caseGovern.js'
-import { mergeTrees, treeContentEqual, collectNodes, applyServerIds } from './mergeUtils.js'
+import { mergeTrees, treeContentEqual, collectNodes, applyServerIds, ensureNodeKeys } from './mergeUtils.js'
 import MindNode from './MindNode.vue'
 
 const NODE_TYPES = [
@@ -479,7 +479,8 @@ function moveNode(sourceId, targetId, mode = 'inside') {
 }
 
 function cloneNodeWithNewIds(node) {
-  const clone = { ...node, id: uid(), children: [] }
+  // 复制出的节点必须拿到新的 _k，否则会和原节点 key 重复
+  const clone = { ...node, id: uid(), _k: undefined, children: [] }
   if (Array.isArray(node.children)) {
     clone.children = node.children.map((ch) => cloneNodeWithNewIds(ch))
   }
@@ -621,7 +622,9 @@ function unregisterNode(id) {
 }
 
 let recomputeTimer = null
+// 渲染 key 见 mergeUtils.ensureNodeKeys：与数据库 id 解耦，保存后回写数字 id 不会重建节点组件。
 function notify() {
+  ensureNodeKeys(tree)
   if (recomputeTimer) {
     clearTimeout(recomputeTimer)
   }
@@ -709,6 +712,7 @@ async function load() {
       tree.collapsed = !!d.collapsed
       tree.image = d.image || ''
       tree.children = d.children || []
+      ensureNodeKeys(tree)
       selectedId.value = tree.id
       // 导出/分享等只读场景：加载后强制全部展开，仅影响前端展示，不修改已保存的折叠状态
       if (props.expandOnLoad) {
