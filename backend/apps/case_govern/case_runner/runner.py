@@ -210,7 +210,7 @@ def _empty_result(spec='', error=None, log_path=''):
             'error': error, 'log_path': log_path}
 
 
-def run_explore(user_description, upload_file_path=None, on_progress=None):
+def run_explore(user_description, upload_file_path=None, on_progress=None, on_recorded=None):
     """完整试运行：提取 URL → 自主探索 → 反推规范 → 返回报告。
 
     :param on_progress: 探索过程中每步关键动作执行后回调 on_progress(text)，用于实时回报进度。
@@ -274,6 +274,7 @@ def run_explore(user_description, upload_file_path=None, on_progress=None):
                 page, user_description, upload_file_path=upload_file_path, start_url=start_url,
                 unique_marker=unique_marker,
                 on_progress=on_progress,
+                on_recorded=on_recorded,
             )
 
             # 探索结束后的页面截图

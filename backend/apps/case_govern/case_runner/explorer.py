@@ -581,8 +581,10 @@ from . import node_cache as nc
 
 
 def _click_by_label(page, label):
-    """按元素文字点击（回放用，避免依赖每次变化的 ref）。精确匹配优先，找不到抛 ExploreError。"""
-    loc = page.get_by_text(label, exact=True)
+    """按元素文字点击（回放用，避免依赖每次变化的 ref）。优先可见元素，其次精确匹配，最后模糊匹配。"""
+    loc = page.locator(f'text="{label}" >> visible=true')
+    if loc.count() == 0:
+        loc = page.get_by_text(label, exact=True)
     if loc.count() == 0:
         loc = page.get_by_text(label, exact=False)
     if loc.count() == 0:
@@ -591,10 +593,14 @@ def _click_by_label(page, label):
 
 
 def _fill_by_label(page, label, text):
-    """按字段名录入（回放用）：优先 label 关联，其次 placeholder。"""
+    """按字段名录入（回放用）：label 关联 → placeholder → 字段名文字之后的第一个输入框（表单行布局）。"""
     loc = page.get_by_label(label, exact=True)
     if loc.count() == 0:
         loc = page.get_by_placeholder(label)
+    if loc.count() == 0:
+        loc = page.locator(
+            f'xpath=//*[normalize-space(.)="{label}" and not(*[normalize-space(.)="{label}"])]'
+            '/following::input[1]')
     if loc.count() == 0:
         raise ExploreError(f'页面上找不到字段「{label}」')
     loc.first.fill(str(text), timeout=10000)
@@ -722,7 +728,7 @@ def _replayed_actions(actions, marker, inputs=None):
 
 
 def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None, start_url=None,
-                     on_progress=None, unique_marker=None, inputs=None):
+                     on_progress=None, unique_marker=None, inputs=None, on_recorded=None):
     """在 page 上执行「页面缓存回放 + AI 探索」，直到 AI 声明 done 且校验通过。
 
     流程：
@@ -889,7 +895,11 @@ def run_explore_loop(page, goal, max_rounds=10, upload_file_path=None, start_url
             # 成功 → 固化本次新探索出的页面（挂在已回放的叶子页之下）
             pages_recorded = recorder.finish(body, unique_marker)
             if path and pages_recorded:
-                nc.save_recorded(path, parent_name, parent_depth, pages_recorded)
+                if on_recorded is not None:
+                    # 调用方自行处理探索结果（如写入 page_patrol 目录），不再写草稿
+                    on_recorded(path, parent_name, parent_depth, pages_recorded)
+                else:
+                    nc.save_recorded(path, parent_name, parent_depth, pages_recorded)
             return True, performed_actions, note
 
         actions = decision.get('actions') or []

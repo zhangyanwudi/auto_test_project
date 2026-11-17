@@ -165,6 +165,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bottom, Delete } from '@element-plus/icons-vue'
 import { fetchMindTree, saveMindTree, updateNodeExecResult } from '../../api/case_govern/caseGovern.js'
 import { mergeTrees, treeContentEqual, collectNodes, applyServerIds, ensureNodeKeys } from './mergeUtils.js'
+import { copiedNode } from './mindClipboard.js'
 import MindNode from './MindNode.vue'
 
 const NODE_TYPES = [
@@ -219,7 +220,6 @@ const dragSourceId = ref(null)
 const dropTargetId = ref(null)
 // 放置模式：inside=成为子节点 before=同级插到目标前 after=同级插到目标后
 const dropMode = ref('inside')
-const copiedNode = ref(null)
 const links = ref([])
 const contentRef = ref(null)
 const nodeEls = {}

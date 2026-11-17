@@ -243,50 +243,80 @@ def delete_page(module, name):
 
 
 def save_recorded(path, parent_name, parent_depth, pages, draft=True):
-    """把本次探索记录的页面链挂到 parent_name 之下并写入草稿（draft=True，默认）。
-
-    草稿需人工确认（approve_draft）后才进入正式库，回归只读正式库。
-    分层规则（与 goals 一致）：
-      - 路径第 k 段对应页面层级（goals 只到页面层级）；
-      - 若路径比记录到的页面多出末尾段（如「单个上传」），末尾页面的动作整体收为该段的操作 operations[段名]，
-        页面本身不再保存这些动作，goals 只记到页面层级。
-    pages 为 PageRecorder.finish() 的结果。
-    """
+    """把本次探索记录的页面链写入草稿文件（draft=True，默认）。草稿需人工确认后才进入正式库。"""
     if not pages:
         return
     module = path[0]
-    data = load_module(module, draft) or {'module': module, 'pages': {}}
+    data = build_recorded(load_module(module, draft) or {'module': module, 'pages': {}},
+                          path, parent_name, parent_depth, pages)
+    _save_module(module, data, draft)
+    cache_logger.info('{}：{} → {}', '草稿已保存（待人工确认）' if draft else '页面缓存已保存',
+                      module, ' → '.join(p['name'] for p in pages))
+
+
+def build_recorded(data, path, parent_name, parent_depth, pages):
+    """把探索记录的页面链合并进 data（纯内存，不写文件），返回 data。
+
+    对应规则（以页面名为准，不按序号）：
+      - 页面名与路径段相同（如「上传达人」），该页面覆盖到该段，goals 记为 path 前缀；
+      - 页面名不在路径中的（如「达人列表」「上传完成弹窗」）不写 goals；
+      - 路径最后一段不是页面名时，视为操作：挂在最后一个匹配页面下，operations[段名]，
+        其步骤为该页面及其之后页面的动作（弹窗等），之后的页面并入操作，不再单独保存。
+      - 若一个路径段都没匹配到，则整条记录挂到路径末端（兼容旧行为）。
+    """
     all_pages = data['pages']
+    module = path[0]
+    segs = path[1:]
 
-    # 末尾多出的路径段 → 操作（operations）
-    op_name = None
-    cap = len(path)
-    if len(path) > parent_depth + len(pages):
-        op_name = path[parent_depth + len(pages)]
-        cap = len(path) - 1
-
+    matches, cursor = {}, 0
     for i, p in enumerate(pages):
+        if p['name'] in segs[cursor:]:
+            j = segs.index(p['name'], cursor)
+            matches[i] = j + 2  # 段数：模块名 + 之前的段 + 本段
+            cursor = j + 1
+    if not matches:
+        matches[len(pages) - 1] = len(path)
+    last_i = max(matches)
+    last_depth = matches[last_i]
+
+    op_name = None
+    if last_depth < len(path) and len(path) - last_depth == 1:
+        op_name = path[-1]
+
+    stored = pages[:last_i + 1] if op_name else pages
+    prev = parent_name or ENTRY_PAGE
+    for i, p in enumerate(stored):
         name = p['name']
-        from_name = (parent_name or ENTRY_PAGE) if i == 0 else pages[i - 1]['name']
         old = all_pages.get(name) or {}
         goals = list(old.get('goals') or [])
-        goal = '--'.join(path[:min(cap, parent_depth + i + 1)])
-        if goal not in goals:
-            goals.append(goal)
+        if i in matches:
+            goal = '--'.join(path[:matches[i]])
+            if goal not in goals:
+                goals.append(goal)
+
         actions = p['actions']
+        enter = p['enter']['actions']
+        verify = p.get('verify')
         operations = dict(old.get('operations') or {})
-        if op_name and i == len(pages) - 1:
+        if op_name and i == last_i:
+            steps = []
+            for q in pages[last_i:]:
+                if q is not p:
+                    steps.extend(q['enter']['actions'])
+                steps.extend(q['actions'])
+            verify = pages[-1].get('verify') or verify
             operations[op_name] = {
-                'enter': [],  # 页面的跳转动作仍在页面 enter 里，操作只含页内步骤
-                'steps': [_to_value_action(a) for a in actions],
-                'verify': p.get('verify'),
+                'enter': [],  # 页面的跳转动作仍在页面 enter 里
+                'steps': [_to_value_action(a) for a in steps],
+                'verify': verify,
             }
-            actions = []
+            actions, verify = [], None
+
         new = {
             'anchor': p.get('anchor') or old.get('anchor'),
-            'enter': {'from': from_name, 'actions': p['enter']['actions']},
+            'enter': {'from': prev, 'actions': enter},
             'actions': actions,
-            'verify': p.get('verify') if not op_name or i < len(pages) - 1 else None,
+            'verify': verify,
             'goals': goals,
             'children': list(old.get('children') or []),
         }
@@ -295,13 +325,11 @@ def save_recorded(path, parent_name, parent_depth, pages, draft=True):
         if operations:
             new['operations'] = operations
         all_pages[name] = new
-        parent = all_pages.get(from_name)
+        parent = all_pages.get(prev)
         if parent is not None and name not in (parent.get('children') or []):
             parent.setdefault('children', []).append(name)
-    _save_module(module, data, draft)
-    cache_logger.info('{}：{} → {}{}', '草稿已保存（待人工确认）' if draft else '页面缓存已保存',
-                      module, ' → '.join(p['name'] for p in pages),
-                      f'，操作「{op_name}」' if op_name else '')
+        prev = name
+    return data
 
 
 def _to_value_action(a):
