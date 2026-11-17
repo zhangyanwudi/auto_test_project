@@ -919,7 +919,13 @@ function onGlobalKeydown(e) {
   if (props.readonly) return
   const t = e.target
   const tag = (t && t.tagName) || ''
-  if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(tag) || (t && t.isContentEditable)) {
+  // 文本输入类元素：快捷键交给浏览器原生处理（编辑文字、复制文字）
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || (t && t.isContentEditable)) {
+    return
+  }
+  // 焦点在按钮/链接上（如点击工具栏后）时，复制粘贴快捷键仍需生效
+  const isCopyPaste = (e.ctrlKey || e.metaKey) && ['c', 'C', 'v', 'V'].includes(e.key)
+  if (!isCopyPaste && ['BUTTON', 'A'].includes(tag)) {
     return
   }
   // F2：进入编辑（标准重命名键）
