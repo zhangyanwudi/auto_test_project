@@ -580,30 +580,287 @@ def _build_history_text(history):
 from . import node_cache as nc
 
 
+def _pick_visible(loc):
+    """从定位器中取第一个可见且不是隐藏镜像（mirror）的元素，没有则返回 None。"""
+    for i in range(min(loc.count(), 30)):
+        el = loc.nth(i)
+        try:
+            cls = el.get_attribute('class') or ''
+            if el.is_visible() and 'mirror' not in cls:
+                return el
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
 def _click_by_label(page, label):
-    """按元素文字点击（回放用，避免依赖每次变化的 ref）。优先可见元素，其次精确匹配，最后模糊匹配。"""
-    loc = page.locator(f'text="{label}" >> visible=true')
-    if loc.count() == 0:
-        loc = page.get_by_text(label, exact=True)
-    if loc.count() == 0:
-        loc = page.get_by_text(label, exact=False)
-    if loc.count() == 0:
-        raise ExploreError(f'页面上找不到文字「{label}」')
-    loc.first.click(timeout=10000)
+    """按元素文字点击（回放用）。在所有完全匹配的元素中选第一个可见、且不是隐藏镜像（如下拉的 mirror）的元素；
+    都没有则退回模糊匹配。找不到抛 ExploreError。"""
+    _pick = _pick_visible
+
+    target = _pick(page.get_by_text(label, exact=True))
+    if target is None:
+        target = _pick(page.get_by_text(label, exact=False))
+    if target is None:
+        # 下拉框的占位文字（如「请选择平台」）常不是普通文字节点，取可见的选择框
+        target = _pick(page.locator('.arco-select-view').filter(has_text=label))
+    if target is None:
+        raise ExploreError(f'页面上找不到可见文字「{label}」')
+    target.click(timeout=10000)
 
 
-def _fill_by_label(page, label, text):
-    """按字段名录入（回放用）：label 关联 → placeholder → 字段名文字之后的第一个输入框（表单行布局）。"""
-    loc = page.get_by_label(label, exact=True)
+def _upload_scope(page):
+    """上传弹窗（含「单个上传」）存在时返回它，否则返回整个页面。
+    避免 placeholder 相同的列表页筛选框（如「请输入」）被误录入。"""
+    modal = page.locator('.arco-modal:visible').filter(has_text='单个上传')
+    return modal.last if modal.count() else page
+
+
+def _fill_by_label(page, label, text, nth=None):
+    """按字段名录入（回放用）：限定在上传弹窗内，label 关联 → placeholder → 字段名之后的第一个输入框。nth 指定第 N 个匹配（0 起）。"""
+    scope = _upload_scope(page)
+    loc = scope.get_by_label(label, exact=True)
     if loc.count() == 0:
-        loc = page.get_by_placeholder(label)
+        loc = scope.get_by_placeholder(label)
     if loc.count() == 0:
-        loc = page.locator(
+        loc = scope.locator(
             f'xpath=//*[normalize-space(.)="{label}" and not(*[normalize-space(.)="{label}"])]'
             '/following::input[1]')
     if loc.count() == 0:
         raise ExploreError(f'页面上找不到字段「{label}」')
-    loc.first.fill(str(text), timeout=10000)
+    target = loc.nth(int(nth)) if nth is not None else loc.first
+    target.fill(str(text), timeout=10000)
+
+
+def _wait_filled(page, label, nth=None, timeout_ms=20000):
+    """等待识别结果：字段（按 placeholder 或 label 定位）的值非空。用于「粘贴链接 → 自动生成 handle」。"""
+    loc = page.get_by_placeholder(label)
+    if loc.count() == 0:
+        loc = page.get_by_label(label, exact=True)
+    if loc.count() == 0:
+        raise ExploreError(f'页面上找不到需要等待的字段「{label}」')
+    target = loc.nth(int(nth)) if nth is not None else loc.first
+    waited = 0
+    while waited < timeout_ms:
+        try:
+            if (target.input_value(timeout=1000) or '').strip():
+                return
+        except Exception:  # noqa: BLE001
+            pass
+        page.wait_for_timeout(500)
+        waited += 500
+    raise ExploreError(f'等待「{label}」识别结果超时（{timeout_ms}ms）')
+
+
+def _table_cell(page, column, row):
+    """定位表格中「列名 × 行号」的单元格。列名按表头文字前缀匹配（如「视频类型」匹配「视频类型*」）。"""
+    idx = page.evaluate("""(col) => {
+      const ths=[...document.querySelectorAll('thead th')].filter(e=>e.offsetParent);
+      return ths.findIndex(e=>e.innerText.trim().replace(/\\*$/,'').startsWith(col));
+    }""", column)
+    if idx < 0:
+        raise ExploreError(f'表格中找不到列「{column}」')
+    rows = page.locator('tbody tr >> visible=true')
+    if rows.count() <= int(row):
+        raise ExploreError(f'表格中没有第 {int(row) + 1} 行')
+    td = rows.nth(int(row)).locator('td').nth(idx)
+    # 表格较宽时需横向滚动（如「合作年月」「受众截图」在右侧）：把目标单元格滚入可视区
+    td.evaluate('el => el.scrollIntoView({block: "nearest", inline: "center"})')
+    page.wait_for_timeout(300)
+    return td
+
+
+def _table_select(page, column, row, value):
+    """表格单元格内的下拉/级联/月份选择。value 用 / 分隔层级（如 Social_tiktok/TT-Video-强商单）。"""
+    cell = _table_cell(page, column, row)
+    # 触发器必须是可见的选择框（不能是隐藏的 input），打开后等待面板渲染
+    # 下拉/级联用 .arco-select-view；月份选择器（如「合作年月」）用 .arco-picker 的输入框
+    trigger = (_pick_visible(cell.locator('.arco-select-view'))
+               or _pick_visible(cell.locator('.arco-picker input'))
+               or cell.locator('.arco-select-view, .arco-picker input').first)
+    trigger.scroll_into_view_if_needed(timeout=5000)
+    trigger.click(force=True, timeout=10000)
+    page.wait_for_timeout(1500)
+    parts = str(value).split('/')
+    for depth, part in enumerate(parts):
+        # 下拉面板打开有延迟：轮询等待选项出现（最长 8 秒）
+        opt = None
+        for _ in range(16):
+            # 先精确匹配选项标签（避免 TT-Video-强商单 与 TT-Video-长线软植 等前缀相近的误判）
+            # 级联选项的文字在 -option-label 子元素里，取其可见的外层 -option 元素
+            labels = page.locator('[class*="-option-label"]:visible').filter(
+                has_text=re.compile('^' + re.escape(part) + '$'))
+            opt = None
+            for i in range(min(labels.count(), 30)):
+                lbl = labels.nth(i)
+                if lbl.is_visible():
+                    opt = lbl.locator('xpath=ancestor::*[contains(@class,"-option") and not(contains(@class,"-option-label"))][1]')
+                    break
+            if opt is None:
+                opt = _pick_visible(page.locator('[class*="-option"]:visible').filter(has_text=part))
+            if opt is None:
+                opt = _pick_visible(page.get_by_text(part, exact=True))
+            if opt is None:
+                # 月份面板的单元格（如「五月」）
+                opt = _pick_visible(page.locator('[class*="picker"] td, [class*="picker-cell"]').filter(
+                    has_text=re.compile('^' + re.escape(part) + '$')))
+            if opt is not None:
+                break
+            page.wait_for_timeout(500)
+        if opt is None:
+            visible = page.evaluate("() => [...document.querySelectorAll('[class*=option-label]')].filter(e=>e.offsetParent).map(e=>e.innerText.trim()).slice(0,25)")
+            explore_logger.error('[页面巡检] 表格级联失败：列={} 第{}行 目标段={} 当前可见选项={}', column, int(row) + 1, part, visible)
+            page.keyboard.press('Escape')
+            raise ExploreError(f'列「{column}」中找不到选项「{part}」（可见选项：{"、".join(visible[:12])}）')
+        if depth < len(parts) - 1:
+            # 非叶子层级（如 Social_tiktok）：点击展开下一级，并等待下一级选项出现
+            # 与探查一致：点击选项的文字标签（label）而不是外层容器，才会展开下一级
+            target_label = opt.locator('[class*="-option-label"]').first
+            (target_label if target_label.count() else opt).click(force=True, timeout=10000)
+            page.wait_for_timeout(1000)
+            continue
+        cb = opt.locator('.arco-checkbox')
+        (cb.first if cb.count() else opt).click(force=True, timeout=10000)
+    page.wait_for_timeout(400)
+    page.keyboard.press('Escape')
+    page.wait_for_timeout(300)
+
+
+def _table_type(page, column, row, value):
+    cell = _table_cell(page, column, row)
+    inp = cell.locator('input').first
+    inp.fill(str(value), timeout=10000)
+
+
+def _table_upload(page, column, row, path):
+    """表格内截图上传。受众截图是「粘贴上传」：单元格里的 copy-area textarea 接收 paste 事件，
+    这里把本地图片以 paste 事件派发到该 textarea；没有粘贴区时退回到单元格内的 file 框。"""
+    if not path:
+        return
+    import base64
+    cell = _table_cell(page, column, row)
+    # 已有截图（单元格内有图片）则不再上传，只有没有截图时才执行上传
+    if cell.locator('img').count() > 0:
+        srcs = cell.locator('img').evaluate_all("els => els.map(e => (e.getAttribute('src') || '').slice(0, 80))")
+        explore_logger.info('[页面巡检] 第{}行截图已存在，跳过上传，图片地址={}', int(row) + 1, srcs)
+        return
+    paste_area = cell.locator('textarea.copy-textarea, textarea').first
+    if paste_area.count():
+        with open(path, 'rb') as f:
+            b64 = base64.b64encode(f.read()).decode()
+        name = os.path.basename(path)
+        mime = 'image/png' if name.lower().endswith('.png') else 'image/jpeg'
+        paste_area.evaluate("""(ta, args) => {
+          const [b64, name, mime] = args;
+          const bin = atob(b64); const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          const dt = new DataTransfer();
+          dt.items.add(new File([arr], name, {type: mime}));
+          ta.focus();
+          ta.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));
+        }""", [b64, name, mime])
+        page.wait_for_timeout(2000)
+        return
+    inputs = cell.locator('input[type=file]')
+    if inputs.count() == 0:
+        raise ExploreError(f'第 {int(row) + 1} 行截图区域中找不到粘贴区或上传框')
+    inputs.first.set_input_files(path, timeout=10000)
+    page.wait_for_timeout(1500)
+
+
+def _click_css(page, selector):
+    """点击选择器匹配的最后一个可见元素（如本行的「+」按钮）。"""
+    el = _pick_visible(page.locator(selector))
+    if el is None:
+        raise ExploreError(f'页面上找不到可点击元素「{selector}」')
+    el.click(force=True, timeout=10000)
+
+
+def _click_row(page, row_text, label, timeout_ms=10000):
+    """列表行内点击：找到文字完全等于 row_text 的单元格，点击同一行内文字为 label 的按钮。"""
+    if not row_text:
+        raise ExploreError('click_row 缺少行标识（row）')
+    cells = page.locator(f'xpath=//*[normalize-space(.)="{row_text}" and not(*[normalize-space(.)="{row_text}"])]')
+    waited = 0
+    while waited < timeout_ms:
+        for i in range(min(cells.count(), 30)):
+            cell = cells.nth(i)
+            if not cell.is_visible():
+                continue
+            row = cell.locator(f'xpath=ancestor::*[.//*[normalize-space(.)="{label}"]][1]')
+            btn = row.get_by_text(label, exact=True)
+            if btn.count() and btn.first.is_visible():
+                btn.first.click(timeout=10000)
+                return
+        page.wait_for_timeout(500)
+        waited += 500
+    raise ExploreError(f'列表中找不到昵称为「{row_text}」且带「{label}」按钮的行')
+
+
+def _recognize(page, placeholder, nth=None, timeout_ms=20000):
+    """链接识别：失焦触发识别，然后等待可见的「待识别」文字数量减少（该行识别完成）。"""
+    loc = _upload_scope(page).get_by_placeholder(placeholder)
+    if loc.count() == 0:
+        raise ExploreError(f'页面上找不到链接输入框「{placeholder}」')
+    target = loc.nth(int(nth)) if nth is not None else loc.first
+    pending = page.locator('text="待识别" >> visible=true')
+    before = pending.count()
+    target.press('Tab')
+    waited = 0
+    while waited < timeout_ms:
+        if pending.count() < before:
+            return
+        page.wait_for_timeout(500)
+        waited += 500
+    raise ExploreError(f'链接「{placeholder}」第 {int(nth or 0) + 1} 项识别超时，平台/handle 未生成')
+
+
+def _select_option(page, label, value, nth=None):
+    """下拉/级联选择（回放用）：限定在上传弹窗内，按 placeholder 找到字段，点击打开，
+    等待选项出现后点击选项文字（如「游戏」「加拿大(CA)」）。"""
+    modal = page.locator('.arco-modal:visible').filter(has_text='单个上传')
+    scope = modal.last if modal.count() else page
+    loc = scope.locator(f'input[placeholder="{label}"]')
+    if loc.count() == 0:
+        raise ExploreError(f'弹窗中找不到下拉字段「{label}」')
+    target = loc.nth(int(nth)) if nth is not None else loc.first
+    if not target.is_visible():
+        # 隐藏输入框（如默认值已选中）：读取所在选择框的显示文字，已是目标值则无需操作
+        shown = target.locator('xpath=ancestor::*[contains(@class,"arco-select-view")][1]').inner_text(timeout=3000)
+        if str(value) in (shown or ''):
+            return
+        raise ExploreError(f'下拉「{label}」不可见，当前显示「{(shown or "").strip()}」，目标「{value}」')
+    target.scroll_into_view_if_needed(timeout=5000)
+    target.click(force=True, timeout=10000)
+    # 选项多时（如国家列表）在列表中滚动难以定位，先输入选项文字过滤，再点击过滤后的选项
+    page.keyboard.type(str(value), delay=60)
+    page.wait_for_timeout(600)
+    # 只匹配下拉选项（class 含 -option），排除输入框里已选中的同名文字
+    opt = page.locator('[class*="-option"]:visible').filter(has_text=value)
+    try:
+        opt.first.wait_for(state='visible', timeout=8000)
+    except Exception:  # noqa: BLE001
+        page.keyboard.press('Escape')
+        raise ExploreError(f'下拉「{label}」中找不到选项「{value}」（或选项加载超时）')
+    opt.first.scroll_into_view_if_needed(timeout=5000)
+    # 多选级联（如达人标签）：选项左侧是复选框，需点击复选框才会勾选；单选则点击选项本身
+    checkbox = opt.first.locator('.arco-checkbox')
+    if checkbox.count():
+        checkbox.first.click(force=True, timeout=10000)
+    else:
+        opt.first.click(timeout=10000)
+    page.wait_for_timeout(500)
+    # 多选/级联：点选后关闭面板，校验所在选择框已显示该值，否则视为未选中
+    # 点击弹窗标题栏收起下拉面板（不能用 Escape：下拉已收起时 Escape 会关闭整个弹窗）
+    header = scope.locator('.arco-modal-header') if modal.count() else None
+    if header is not None and header.count():
+        header.first.click(timeout=5000, position={'x': 20, 'y': 10})
+    page.wait_for_timeout(400)
+    name = str(value).split('(')[0].strip()  # 「加拿大(CA)」→「加拿大」，兼容显示不带代码的情况
+    shown_loc = scope.locator('.arco-select-view-value, .arco-select-view-single, .arco-select-view-multiple, .arco-select-view-tag')
+    shown = ' | '.join(t for t in shown_loc.all_inner_texts() if t.strip())
+    if name not in shown:
+        raise ExploreError(f'下拉「{label}」点选「{value}」后输入框显示「{shown.strip()}」，选择未生效')
 
 
 def _select_first_by_label(page, label):
@@ -636,20 +893,82 @@ def _body_text(page):
         return ''
 
 
-def replay_actions(page, actions, marker, upload_file_path=None, inputs=None, where=''):
+def _sub_ctx(text, ctx):
+    """循环上下文替换：${item.X} → 当前数据项字段，${index} → 当前序号（0 起）。"""
+    import re as _re
+    if not ctx or text is None:
+        return text
+    out = str(text).replace('${index}', str(ctx.get('index', '')))
+    item = ctx.get('item') or {}
+    data = ctx.get('data') or {}
+    out = _re.sub(r'\$\{item\.([^}]+)\}', lambda m: str(item.get(m.group(1), '')), out)
+    def _path(m):
+        cur = data
+        for key in m.group(1).split('.'):
+            cur = cur.get(key, '') if isinstance(cur, dict) else ''
+        return str(cur)
+    return _re.sub(r'\$\{data\.([^}]+)\}', _path, out)
+
+
+def replay_actions(page, actions, marker, upload_file_path=None, inputs=None, where='', ctx=None):
     """回放一组动作（按文字 label 定位）。失败抛 ExploreError。
 
-    录入值支持 {{user_name}}（本次唯一标识）与 ${inputs.字段名}（调用参数），
-    动作的值优先取 value，其次 text。
+    值占位：{{user_name}}（唯一标识）、${inputs.X}（调用参数）、循环内 ${item.X} / ${index}。
+    新增动作：
+      repeat      over=数据键名, steps=[...]：对 data[over] 的每一项回放 steps
+      wait_filled label, nth：等待该字段出现非空值（识别完成）
+      select      label, value, nth：下拉选择
+    步骤可带 nth（第 N 个匹配，0 起）与 except_last（循环中最后一项不执行，如最后一行不再点「添加」）。
     """
     for a in actions or []:
         act = a.get('action')
+        if a.get('except_last') and ctx and ctx.get('index') == ctx.get('count', 0) - 1:
+            continue
+        nth = _sub_ctx(a.get('nth'), ctx) if a.get('nth') is not None else None
+        # 录入值为空（data 中留空）的 type / select 视为「不录入」，直接跳过
+        if act in ('type', 'select') and not str(_sub_ctx(a.get('value', a.get('text', '')), ctx) or '').strip():
+            continue
         try:
+            if act == 'repeat':
+                items = (ctx or {}).get('data', {}).get(a.get('over')) if ctx else None
+                if items is None:
+                    items = ((ctx or {}).get('data') or {}).get(a.get('over'))
+                if not isinstance(items, list):
+                    raise ExploreError(f'循环数据「{a.get("over")}」不存在或不是数组')
+                for idx, item in enumerate(items):
+                    sub = {'data': (ctx or {}).get('data') or {}, 'item': item, 'index': idx, 'count': len(items)}
+                    replay_actions(page, a.get('steps') or [], marker, upload_file_path, inputs,
+                                   where=f'{where}第{idx + 1}项：', ctx=sub)
+                continue
             if act == 'click':
-                _click_by_label(page, a.get('label') or '')
+                _click_by_label(page, _sub_ctx(a.get('label') or '', ctx))
             elif act == 'type':
-                value = a.get('value', a.get('text', ''))
-                _fill_by_label(page, a.get('label') or '', nc.fill_values(value, marker, inputs))
+                value = _sub_ctx(a.get('value', a.get('text', '')), ctx)
+                _fill_by_label(page, _sub_ctx(a.get('label') or '', ctx),
+                               nc.fill_values(value, marker, inputs), nth=nth)
+            elif act == 'table_select':
+                _table_select(page, _sub_ctx(a.get('column') or '', ctx), _sub_ctx(a.get('row', 0), ctx),
+                              nc.fill_values(_sub_ctx(a.get('value') or '', ctx), marker, inputs))
+            elif act == 'table_type':
+                _table_type(page, _sub_ctx(a.get('column') or '', ctx), _sub_ctx(a.get('row', 0), ctx),
+                            nc.fill_values(_sub_ctx(a.get('value') or '', ctx), marker, inputs))
+            elif act == 'table_upload':
+                _table_upload(page, _sub_ctx(a.get('column') or '', ctx), _sub_ctx(a.get('row', 0), ctx),
+                              _abs_asset(_sub_ctx(a.get('value') or '', ctx)))
+            elif act == 'click_css':
+                _click_css(page, a.get('selector') or '')
+            elif act == 'click_row':
+                _click_row(page, nc.fill_values(_sub_ctx(a.get('row') or '', ctx), marker, inputs),
+                           _sub_ctx(a.get('label') or '', ctx))
+            elif act == 'recognize':
+                _recognize(page, _sub_ctx(a.get('label') or '', ctx), nth=nth,
+                           timeout_ms=int(a.get('timeout_ms') or 20000))
+            elif act == 'wait_filled':
+                _wait_filled(page, _sub_ctx(a.get('label') or '', ctx), nth=nth,
+                             timeout_ms=int(a.get('timeout_ms') or 20000))
+            elif act == 'select':
+                _select_option(page, _sub_ctx(a.get('label') or '', ctx),
+                               nc.fill_values(_sub_ctx(a.get('value') or '', ctx), marker, inputs), nth=nth)
             elif act == 'upload':
                 _upload_file(page, upload_file_path)
             elif act == 'select_first':
@@ -665,7 +984,33 @@ def replay_actions(page, actions, marker, upload_file_path=None, inputs=None, wh
             raise ExploreError(f'{where}回放 {act} 失败：{e}')
         except Exception as e:  # noqa: BLE001
             raise ExploreError(f'{where}回放 {act} 异常：{e}')
-        page.wait_for_timeout(600)
+        page.wait_for_timeout(400)
+
+
+def _verify_row(page, text, marker, inputs, where, timeout_ms=15000):
+    """列表行校验：页面上必须有一个可见元素的文字**完全等于**目标值（如达人名称 = 本次唯一标识）。"""
+    text = nc.fill_values(text, marker, inputs)
+    if not text:
+        return
+    waited = 0
+    while waited < timeout_ms:
+        hit = page.locator(f'xpath=//*[normalize-space(.)="{text}" and not(*[normalize-space(.)="{text}"])]')
+        if any(hit.nth(i).is_visible() for i in range(min(hit.count(), 20))):
+            return
+        page.wait_for_timeout(500)
+        waited += 500
+    raise ExploreError(f'{where}列表中未找到名称等于「{text}」的记录，保存可能未生效')
+
+
+def _abs_asset(path):
+    """相对路径按后端目录解析（如 page_patrol/assets/xxx.png）。"""
+    import os as _os
+    if not path:
+        return ''
+    if _os.path.isabs(path):
+        return path
+    from django.conf import settings
+    return _os.path.join(str(settings.BASE_DIR), path)
 
 
 def _verify_text(page, text, marker, inputs, where):
@@ -709,10 +1054,12 @@ def replay_filters(page, pg, filter_values, marker):
 def replay_operation(page, op_name, op, marker, inputs, upload_file_path=None):
     """回放页面上的带参数操作：enter（可选）→ steps（值用 ${inputs.X} 替换）→ verify。"""
     where = f'操作「{op_name}」'
+    ctx = {'data': op.get('data') or {}}
     if op.get('enter'):
         replay_actions(page, op['enter'], marker, upload_file_path, inputs, where=where + ' 进入：')
-    replay_actions(page, op.get('steps') or [], marker, upload_file_path, inputs, where=where + '：')
+    replay_actions(page, op.get('steps') or [], marker, upload_file_path, inputs, where=where + '：', ctx=ctx)
     _verify_text(page, op.get('verify'), marker, inputs, where)
+    _verify_row(page, op.get('verify_row'), marker, inputs, where)
 
 
 def _replayed_actions(actions, marker, inputs=None):

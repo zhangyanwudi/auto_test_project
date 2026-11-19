@@ -114,8 +114,42 @@ def _label(a):
     return f"{a.get('action')}({a.get('label') or a.get('key') or a.get('ms', '')})"
 
 
-def execute(data, upload_path=None, headless=False):
-    """按 JSON 回放。返回 {'ok', 'marker', 'error', 'screenshot'}。"""
+def _resolve_captured(items):
+    """把事件回调里记录下来的原始报文解析成 {键: {'request': dict, 'response': dict}}。
+
+    回调里只保存字符串（请求/响应体），解析放到回放结束后做。
+    解析失败时保留原文片段，便于排查。
+    """
+    out = {}
+    for it in items or []:
+        key = it.get('key')
+        if not key or key in out:
+            continue
+        # 请求体/响应体在事件回调里已读成字符串（回放结束后请求对象已失效，post_data 会返回 None）
+        out[key] = _parse_body(it.get('request_text'), it.get('response_text'))
+    return out
+
+
+def _parse_body(req_text, resp_text):
+    """把原始文本解析成 {'request': dict, 'response': dict}；解析失败保留原文，便于排查。"""
+    entry = {}
+    try:
+        entry['request'] = json.loads(req_text) if req_text else {}
+    except Exception:  # noqa: BLE001
+        entry['request'] = {'_raw': (req_text or '')[:2000]}
+    try:
+        entry['response'] = json.loads(resp_text) if resp_text else {}
+    except Exception:  # noqa: BLE001
+        entry['response'] = {'_raw': (resp_text or '')[:2000]}
+    return entry
+
+
+def execute(data, upload_path=None, headless=False, post_check=None, response_watch=None):
+    """按 JSON 回放。返回 {'ok', 'marker', 'error', 'screenshot'}。
+
+    response_watch: {键名: URL 片段}，命中后记录该响应，解析好的 JSON 作为第二个参数传给
+    post_check(page, captured)，供 case 从接口响应中取值（如订单ID）。
+    """
     from playwright.sync_api import sync_playwright
     from apps.case_govern.case_runner.explorer import (
         ExploreError, replay_filters, replay_operation, replay_page,
@@ -141,12 +175,45 @@ def execute(data, upload_path=None, headless=False):
     filters = run.get('filters') or {}
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
-        context = browser.new_context()
+        # 有界面时最大化窗口；no_viewport 让页面随窗口尺寸展示，不再是固定小视口
+        browser = p.chromium.launch(
+            headless=headless,
+            args=[] if headless else ['--start-maximized'],
+        )
+        # 无痕模式（项目约定）：每次执行都新建独立 context，不复用 cookie / localStorage / 缓存，
+        # 也不加载已登录的持久化 profile；登录态只由 _inject_explore_login 临时注入。
+        # 注意：不要改成 launch_persistent_context 或复用 storage_state，否则会污染后续执行。
+        context = browser.new_context(no_viewport=not headless)
         page = None
+        captured_items = []
         try:
             _inject_explore_login(context, DEFAULT_START_URL)
             page = context.new_page()
+            if response_watch:
+                # 命中的请求/响应体必须在回调里立即读成字符串：
+                # 回放结束后 Playwright 已释放 Request 对象，此时再读 post_data 只会得到 None。
+                def _on_response(resp):
+                    url = resp.url or ''
+                    for key, frag in response_watch.items():
+                        if not frag or frag not in url:
+                            continue
+                        if any(it.get('key') == key for it in captured_items):
+                            break
+                        try:
+                            req_text = resp.request.post_data or ''
+                        except Exception:  # noqa: BLE001
+                            req_text = ''
+                        try:
+                            resp_text = resp.text()
+                        except Exception:  # noqa: BLE001
+                            resp_text = ''
+                        if os.environ.get('PAGE_PATROL_DEBUG_RESP'):
+                            print(f'[调试] 命中 {key}：{url} '
+                                  f'post_data长度={len(req_text)} resp长度={len(resp_text)}', flush=True)
+                        captured_items.append({'key': key, 'request_text': req_text,
+                                               'response_text': resp_text})
+                        break
+                page.on('response', _on_response)
             page.goto(DEFAULT_START_URL, wait_until='domcontentloaded', timeout=30000)
 
             leaf_name, leaf = chain[-1]
@@ -170,7 +237,17 @@ def execute(data, upload_path=None, headless=False):
                 op = leaf['operations'][op_name]
                 replay_operation(page, op_name, op, marker, inputs, upload_file_path=upload)
                 print(f'✅ 操作「{op_name}」执行成功')
-            return {'ok': True, 'marker': marker, 'error': None, 'screenshot': None}
+            payload = None
+            if post_check is not None:
+                # 操作之后的业务校验（如订单状态、达人类型、产品组合）；失败则整个 case 失败
+                captured = _resolve_captured(captured_items)
+                for k, v in captured.items():
+                    print(f'✅ 已捕获接口响应：{k}')
+                good, msg, payload = post_check(page, captured)
+                if not good:
+                    return {'ok': False, 'marker': marker, 'error': msg, 'screenshot': _shot(page, marker)}
+                print(f'✅ 校验通过：{msg}')
+            return {'ok': True, 'marker': marker, 'error': None, 'screenshot': None, 'payload': payload}
         except ExploreError as e:
             return {'ok': False, 'marker': marker, 'error': str(e), 'screenshot': _shot(page, marker)}
         except Exception as e:  # noqa: BLE001

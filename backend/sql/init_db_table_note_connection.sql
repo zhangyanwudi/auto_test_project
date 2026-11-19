@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS `z_db_table_note_connection` (
     `user`          VARCHAR(128)    NOT NULL                            COMMENT '用户名',
     `password`      VARCHAR(255)    NOT NULL                            COMMENT '密码',
     `database`      VARCHAR(128)    NOT NULL                            COMMENT '数据库名',
+    `db_type`       VARCHAR(16)     NOT NULL DEFAULT 'mysql'            COMMENT '数据库类型（mysql / postgre）',
+    `schema_name`   VARCHAR(128)    NOT NULL DEFAULT 'public'           COMMENT 'PostgreSQL 模式名（仅 postgre 使用）',
     `create_time`   DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
     `update_time`   DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '最后更新时间',
     PRIMARY KEY (`id`),

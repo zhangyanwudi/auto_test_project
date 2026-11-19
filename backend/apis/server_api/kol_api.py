@@ -853,7 +853,7 @@ class KolsysApi(KolEnum):
 if __name__ == "__main__":
     kolsys_api = KolsysApi(is_debug=True)
     user_email = "xiaojiaqi@hungrystudio.com"  # 组员
-    # user_email='liuli@hungrystudio.com'   # 组员
+    user_email='liuli@hungrystudio.com'   # 组员
     user_email = "zhangyan02195@hungrystudio.com"  # 管理员
     # user_email = "guosiyi@hungrystudio.com"  #审核员
     # user_email='limengqi@hungrystudio.com'   #别的组长
@@ -864,11 +864,11 @@ if __name__ == "__main__":
     # user_email='huangyunru@hungrystudio.com'  # 春兰
     # user_email='liangxiaotong@hungrystudio.com'  # CZ15FXK891-26100001
     # user_email='dingyongliang@hungrystudio.com'
-    kolsys_api.get_user_token(user_email, is_set_cache=False,
+    kolsys_api.get_user_token(user_email, is_set_cache=True,
                               domains=[KolEnum.Domain.KOL_TEST])
     # kolsys_api.query_order_reviews_list_data(keyword_type=KolEnum.KeyWordType.SINGLE.value)
 
-    status,resp=kolsys_api.get_create_ad_video_list_data()
+    # status,resp=kolsys_api.query_order_reviews_list_data_by_me()
     # from task_file.run_kol_activate_pro import _check_list_has_data
     # print(_check_list_has_data(status,resp))
 

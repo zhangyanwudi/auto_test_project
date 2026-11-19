@@ -247,11 +247,17 @@
         <el-form-item label="显示名称" prop="name">
           <el-input v-model="connForm.name" placeholder="如 达人系统库" />
         </el-form-item>
+        <el-form-item label="数据库类型" prop="db_type">
+          <el-select v-model="connForm.db_type" style="width: 100%" @change="onConnDbTypeChange">
+            <el-option label="MySQL" value="mysql" />
+            <el-option label="PostgreSQL" value="postgre" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="地址" prop="host">
           <el-input v-model="connForm.host" placeholder="如 127.0.0.1" />
         </el-form-item>
         <el-form-item label="端口" prop="port">
-          <el-input v-model="connForm.port" placeholder="默认 3306" />
+          <el-input v-model="connForm.port" :placeholder="connForm.db_type === 'postgre' ? '默认 5432' : '默认 3306'" />
         </el-form-item>
         <el-form-item label="用户名" prop="user">
           <el-input v-model="connForm.user" placeholder="数据库用户名" />
@@ -265,7 +271,10 @@
           />
         </el-form-item>
         <el-form-item label="数据库" prop="database">
-          <el-input v-model="connForm.database" placeholder="库名，如 kolsys" />
+          <el-input v-model="connForm.database" :placeholder="connForm.db_type === 'postgre' ? '库名，如 postgres' : '库名，如 kolsys'" />
+        </el-form-item>
+        <el-form-item v-if="connForm.db_type === 'postgre'" label="模式" prop="schema_name">
+          <el-input v-model="connForm.schema_name" placeholder="默认 public" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -449,11 +458,13 @@ const connFormRef = ref(null)
 const connForm = reactive({
   id: '',
   name: '',
+  db_type: 'mysql',
   host: '',
   port: 3306,
   user: '',
   password: '',
   database: '',
+  schema_name: 'public',
 })
 
 const connRules = {
@@ -463,15 +474,26 @@ const connRules = {
   database: [{ required: true, message: '请输入数据库名', trigger: 'blur' }],
 }
 
+/* 切换数据库类型时，若端口仍是另一类型的默认值则同步切换默认端口 */
+function onConnDbTypeChange(type) {
+  const DEFAULT_PORT = { mysql: 3306, postgre: 5432 }
+  const current = Number(connForm.port)
+  if (!current || current === DEFAULT_PORT.mysql || current === DEFAULT_PORT.postgre) {
+    connForm.port = DEFAULT_PORT[type] || 3306
+  }
+}
+
 function resetConnForm() {
   connEditingId.value = null
   connForm.id = ''
   connForm.name = ''
+  connForm.db_type = 'mysql'
   connForm.host = ''
   connForm.port = 3306
   connForm.user = ''
   connForm.password = ''
   connForm.database = ''
+  connForm.schema_name = 'public'
 }
 
 function openConnDialog(conn) {
@@ -480,11 +502,13 @@ function openConnDialog(conn) {
     connEditingId.value = conn.id
     connForm.id = conn.id
     connForm.name = conn.name
+    connForm.db_type = conn.db_type || 'mysql'
     connForm.host = conn.host
     connForm.port = conn.port
     connForm.user = conn.user
     connForm.password = ''
     connForm.database = conn.database
+    connForm.schema_name = conn.schema_name || 'public'
   }
   connDialogVisible.value = true
 }
@@ -515,11 +539,13 @@ async function submitConn() {
     const res = await saveConnection({
       id: connForm.id.trim(),
       name: connForm.name.trim(),
+      db_type: connForm.db_type,
       host: connForm.host.trim(),
       port: connForm.port,
       user: connForm.user.trim(),
       password: connForm.password,
       database: connForm.database.trim(),
+      schema_name: (connForm.schema_name || '').trim() || 'public',
     })
     if (res.code === 0) {
       ElMessage.success(res.message || '保存成功')

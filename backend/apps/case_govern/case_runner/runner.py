@@ -265,6 +265,8 @@ def run_explore(user_description, upload_file_path=None, on_progress=None, on_re
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
+            # 无痕模式（项目约定）：每次新建独立 context，不复用 cookie / localStorage / storage_state。
+            # 不要改成 launch_persistent_context 或传入已保存的登录态。
             context = browser.new_context()
             _inject_explore_login(context, start_url)
             page = context.new_page()

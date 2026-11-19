@@ -54,6 +54,10 @@ def _load_connections():
     return list(ZDbTableNoteConnection.objects.all().order_by('id'))
 
 
+# 支持的数据库类型 -> 默认端口
+DB_TYPE_DEFAULT_PORT = {'mysql': 3306, 'postgre': 5432}
+
+
 def _connection_row_to_dict(m):
     return {
         'id': m.connection_id,
@@ -63,6 +67,8 @@ def _connection_row_to_dict(m):
         'user': m.user,
         'password': m.password,
         'database': m.database,
+        'db_type': m.db_type or 'mysql',
+        'schema_name': m.schema_name or 'public',
     }
 
 
@@ -91,26 +97,55 @@ def _public_connection(c):
         'port': c.get('port', 3306),
         'user': c.get('user', ''),
         'database': c.get('database', ''),
+        'db_type': c.get('db_type', 'mysql'),
+        'schema_name': c.get('schema_name', 'public'),
         'has_password': bool(c.get('password', '')),
     }
 
 
+def _db_type(cfg):
+    """连接配置的数据库类型（mysql / postgre），缺省为 mysql。"""
+    return (cfg.get('db_type') or 'mysql').lower()
+
+
 def _open_conn(cfg):
-    """用连接配置建立 pymysql 连接（autocommit=True）。"""
+    """按数据库类型建立连接（autocommit=True）：mysql -> pymysql，postgre -> psycopg2。"""
     port = cfg.get('port')
     try:
         port = int(port)
     except (TypeError, ValueError):
-        port = 3306
-    return pymysql.connect(
-        host=cfg.get('host', ''),
-        port=port,
-        user=cfg.get('user', ''),
-        password=cfg.get('password', ''),
-        database=cfg.get('database', ''),
-        charset='utf8mb4',
-        autocommit=True,
-    )
+        port = DB_TYPE_DEFAULT_PORT.get(_db_type(cfg), 3306)
+
+    db_type = _db_type(cfg)
+    if db_type == 'postgre':
+        # 延迟导入：未使用 PostgreSQL 的环境不强制依赖 psycopg2
+        import psycopg2
+        conn = psycopg2.connect(
+            host=cfg.get('host', ''),
+            port=port,
+            user=cfg.get('user', ''),
+            password=cfg.get('password', ''),
+            dbname=cfg.get('database', ''),
+            connect_timeout=10,
+        )
+        conn.autocommit = True
+        return conn
+    if db_type == 'mysql':
+        return pymysql.connect(
+            host=cfg.get('host', ''),
+            port=port,
+            user=cfg.get('user', ''),
+            password=cfg.get('password', ''),
+            database=cfg.get('database', ''),
+            charset='utf8mb4',
+            autocommit=True,
+        )
+    raise ValueError('不支持的数据库类型: %s' % db_type)
+
+
+def _pg_schema(cfg):
+    """PostgreSQL 使用的模式名，缺省 public。"""
+    return (cfg.get('schema_name') or 'public').strip() or 'public'
 
 
 def _table_note_public(m):
@@ -141,13 +176,24 @@ def _fetch_table_columns(cfg, table_name):
     conn = _open_conn(cfg)
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                'SELECT column_name, column_comment '
-                'FROM information_schema.columns '
-                'WHERE table_schema = %s AND table_name = %s '
-                'ORDER BY ordinal_position',
-                (cfg.get('database', ''), table_name),
-            )
+            if _db_type(cfg) == 'postgre':
+                # 字段注释：col_description(表oid, 字段序号)；ordinal_position 即 attnum
+                cur.execute(
+                    'SELECT c.column_name, '
+                    "col_description(format('%%I.%%I', c.table_schema, c.table_name)::regclass, c.ordinal_position) "
+                    'FROM information_schema.columns c '
+                    'WHERE c.table_schema = %s AND c.table_name = %s '
+                    'ORDER BY c.ordinal_position',
+                    (_pg_schema(cfg), table_name),
+                )
+            else:
+                cur.execute(
+                    'SELECT column_name, column_comment '
+                    'FROM information_schema.columns '
+                    'WHERE table_schema = %s AND table_name = %s '
+                    'ORDER BY ordinal_position',
+                    (cfg.get('database', ''), table_name),
+                )
             rows = cur.fetchall()
     finally:
         conn.close()
@@ -189,6 +235,11 @@ def connection_save(request):
     except (TypeError, ValueError):
         port = 3306
 
+    db_type = (body.get('db_type') or 'mysql').strip().lower()
+    if db_type not in DB_TYPE_DEFAULT_PORT:
+        return JsonResponse({'code': 400, 'message': '不支持的数据库类型：%s' % db_type}, status=400)
+    schema_name = (body.get('schema_name') or '').strip() or 'public'
+
     try:
         m = ZDbTableNoteConnection.objects.get(connection_id=conn_id)
     except ZDbTableNoteConnection.DoesNotExist:
@@ -207,6 +258,8 @@ def connection_save(request):
             user=user,
             password=password,
             database=database,
+            db_type=db_type,
+            schema_name=schema_name,
         )
     else:
         # 编辑：password 留空保持原密码
@@ -218,6 +271,8 @@ def connection_save(request):
         m.user = user
         m.password = password
         m.database = database
+        m.db_type = db_type
+        m.schema_name = schema_name
         m.save()
 
     return JsonResponse({'code': 0, 'message': '保存成功'})
@@ -262,12 +317,22 @@ def table_list(request):
 
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                'SELECT table_name, table_comment '
-                'FROM information_schema.tables '
-                'WHERE table_schema = %s ORDER BY table_name',
-                (cfg.get('database', ''),),
-            )
+            if _db_type(cfg) == 'postgre':
+                # 表注释：obj_description 取 pg_class 注释；%%I 为 psycopg2 下转义后的 %I
+                cur.execute(
+                    'SELECT t.table_name, '
+                    "obj_description(format('%%I.%%I', t.table_schema, t.table_name)::regclass, 'pg_class') "
+                    'FROM information_schema.tables t '
+                    'WHERE t.table_schema = %s ORDER BY t.table_name',
+                    (_pg_schema(cfg),),
+                )
+            else:
+                cur.execute(
+                    'SELECT table_name, table_comment '
+                    'FROM information_schema.tables '
+                    'WHERE table_schema = %s ORDER BY table_name',
+                    (cfg.get('database', ''),),
+                )
             rows = cur.fetchall()
     finally:
         conn.close()

@@ -1,0 +1,180 @@
+{
+  "module": "订单履约",
+  "pages": {
+    "达人营销平台": {
+      "anchor": null,
+      "enter": {
+        "from": "首页",
+        "actions": []
+      },
+      "actions": [
+        {
+          "action": "wait",
+          "ms": 2000
+        }
+      ],
+      "verify": null,
+      "goals": [],
+      "children": [
+        "达人列表"
+      ]
+    },
+    "达人列表": {
+      "anchor": "自定义筛选",
+      "enter": {
+        "from": "达人营销平台",
+        "actions": [
+          {
+            "action": "click",
+            "label": "达人管理"
+          }
+        ]
+      },
+      "actions": [],
+      "verify": null,
+      "goals": [
+        "订单履约"
+      ],
+      "children": [],
+      "operations": {
+        "创建订单": {
+          "kind": "write",
+          "inputs": [
+            "达人昵称"
+          ],
+          "enter": [],
+          "data": {
+            "活动名称": "测试活动（CPN20261015002）",
+            "平台": "Social_tiktok",
+            "报价": "100",
+            "订单": [
+              {
+                "产品类型": "Rotate Rings"
+              },
+              {
+                "产品类型": "Double Tile!"
+              },
+              {
+                "产品类型": "Mahjong Blast!"
+              },
+              {
+                "产品类型": "Block Crush!"
+              },
+              {
+                "产品类型": "Block Blast!"
+              },
+              {
+                "产品类型": "Block Blast!"
+              }
+            ],
+            "视频类型": "Social_tiktok/TT-Video-强商单",
+            "单支价格": "10.01",
+            "合作年月": "五月",
+            "受众截图": "page_patrol/assets/受众截图示例.png"
+          },
+          "steps": [
+            {
+              "action": "type",
+              "label": "达人昵称",
+              "value": "${inputs.达人昵称}"
+            },
+            {
+              "action": "click",
+              "label": "查询"
+            },
+            {
+              "action": "wait",
+              "ms": 1500
+            },
+            {
+              "action": "click_row",
+              "row": "${inputs.达人昵称}",
+              "label": "创建订单"
+            },
+            {
+              "action": "wait",
+              "ms": 1500
+            },
+            {
+              "action": "select",
+              "label": "请输入活动名称搜索",
+              "value": "${data.活动名称}"
+            },
+            {
+              "action": "click",
+              "label": "请选择平台"
+            },
+            {
+              "action": "click",
+              "label": "${data.平台}"
+            },
+            {
+              "action": "type",
+              "label": "请输入报价",
+              "value": "${data.报价}"
+            },
+            {
+              "action": "click",
+              "label": "创建订单"
+            },
+            {
+              "action": "wait",
+              "ms": 2500
+            },
+            {
+              "action": "repeat",
+              "over": "订单",
+              "steps": [
+                {
+                  "action": "table_select",
+                  "column": "视频类型",
+                  "row": "${index}",
+                  "value": "${data.视频类型}"
+                },
+                {
+                  "action": "table_select",
+                  "column": "产品类型",
+                  "row": "${index}",
+                  "value": "${item.产品类型}"
+                },
+                {
+                  "action": "table_type",
+                  "column": "单支价格",
+                  "row": "${index}",
+                  "value": "${data.单支价格}"
+                },
+                {
+                  "action": "table_select",
+                  "column": "合作年月",
+                  "row": "${index}",
+                  "value": "${data.合作年月}"
+                },
+                {
+                  "action": "table_upload",
+                  "column": "受众截图",
+                  "row": "${index}",
+                  "value": "${data.受众截图}"
+                },
+                {
+                  "action": "click_css",
+                  "selector": "div.arco-space-item:has(svg.arco-icon-plus-circle)",
+                  "except_last": true
+                }
+              ]
+            },
+            {
+              "action": "wait",
+              "ms": 1000
+            },
+            {
+              "action": "click",
+              "label": "提交审核"
+            }
+          ],
+          "verify": "${inputs.达人昵称}",
+          "verify_row": null
+        }
+      }
+    }
+  }
+}

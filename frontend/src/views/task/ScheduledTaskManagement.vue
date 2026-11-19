@@ -1172,5 +1172,21 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
+  min-width: 0;
+}
+
+/* 弹窗宽度有限时允许分页控件换行，避免“共 N 条”和每页条数被截断 */
+.list-pagination :deep(.el-pagination) {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 8px;
+  max-width: 100%;
+}
+
+.list-pagination :deep(.el-pagination__total),
+.list-pagination :deep(.el-pagination__sizes),
+.list-pagination :deep(.el-pagination__jump) {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 </style>

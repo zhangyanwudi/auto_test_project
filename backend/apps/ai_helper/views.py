@@ -1483,6 +1483,8 @@ async def _login_and_get_token():
             headless=True,
             args=['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
         )
+        # 无痕模式（项目约定）：每次新建独立 context，不复用 cookie / localStorage / storage_state。
+        # 不要改成 launch_persistent_context 或传入已保存的登录态。
         context = await browser.new_context(
             viewport={'width': 1920, 'height': 1080},
             locale='zh-CN',

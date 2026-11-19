@@ -36,6 +36,10 @@ class ZDbTableNoteConnection(models.Model):
     user = models.CharField('用户名', max_length=128)
     password = models.CharField('密码', max_length=255)
     database = models.CharField('数据库名', max_length=128)
+    db_type = models.CharField('数据库类型', max_length=16, default='mysql',
+                               help_text='mysql / postgre')
+    schema_name = models.CharField('模式名', max_length=128, blank=True, default='public',
+                                   help_text='仅 PostgreSQL 使用，默认 public')
     create_time = models.DateTimeField('创建时间', auto_now_add=True)
     update_time = models.DateTimeField('更新时间', auto_now=True)
 

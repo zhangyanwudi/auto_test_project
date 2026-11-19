@@ -3,6 +3,8 @@ APScheduler>=3.10,<4
 djangorestframework>=3.14
 django-cors-headers>=4.3
 PyMySQL>=1.1.0
+# PostgreSQL 驱动：数据库备注（db_table_note）连接 postgre 类型连接时使用
+psycopg2-binary>=2.9.9
 # 服务端图片识别：默认腾讯云 OCR（apis/ocr/views.py）；可选 ?engine=tesseract 走本机 Tesseract
 Pillow>=10.0.0
 pytesseract>=0.3.10

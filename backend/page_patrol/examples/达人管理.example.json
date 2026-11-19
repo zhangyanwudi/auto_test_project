@@ -1,0 +1,210 @@
+{
+  "module": "达人管理",
+  "pages": {
+    "达人营销平台": {
+      "anchor": null,
+      "enter": {
+        "from": "首页",
+        "actions": []
+      },
+      "actions": [
+        {
+          "action": "wait",
+          "ms": 2000
+        }
+      ],
+      "verify": null,
+      "goals": [],
+      "children": [
+        "达人管理"
+      ]
+    },
+    "达人管理": {
+      "anchor": "自定义筛选",
+      "enter": {
+        "from": "达人营销平台",
+        "actions": [
+          {
+            "action": "click",
+            "label": "达人管理"
+          }
+        ]
+      },
+      "actions": [],
+      "verify": null,
+      "goals": [
+        "达人管理"
+      ],
+      "children": [
+        "上传达人"
+      ],
+      "filters": {
+        "submit": {
+          "action": "click",
+          "label": "查询"
+        },
+        "reset": {
+          "action": "click",
+          "label": "重置"
+        },
+        "fields": {
+          "达人昵称": {
+            "action": "type",
+            "label": "达人昵称"
+          },
+          "社媒名称": {
+            "action": "type",
+            "label": "社媒名称"
+          },
+          "联系方式": {
+            "action": "type",
+            "label": "联系方式"
+          }
+        }
+      },
+      "operations": {}
+    },
+    "上传达人": {
+      "anchor": "添加平台账号",
+      "enter": {
+        "from": "达人管理",
+        "actions": [
+          {
+            "action": "click",
+            "label": "上传达人"
+          }
+        ]
+      },
+      "actions": [],
+      "verify": null,
+      "goals": [
+        "达人管理--上传达人"
+      ],
+      "children": [],
+      "operations": {
+        "单个上传": {
+          "kind": "write",
+          "inputs": [],
+          "enter": [],
+          "data": {
+            "平台账号": [
+              {
+                "链接": "https://www.tiktok.com/@{{user_name}}"
+              },
+              {
+                "链接": "https://www.youtube.com/@{{user_name}}"
+              },
+              {
+                "链接": "https://www.instagram.com/{{user_name}}"
+              }
+            ],
+            "联系方式": [
+              {
+                "类型": "邮箱",
+                "值": "{{user_name}}@example.com"
+              }
+            ],
+            "其他信息": {
+              "达人所在地": "加拿大(CA)",
+              "达人语言": "英语",
+              "性别": "女",
+              "受众地区": "加拿大(CA)",
+              "达人类型": "KOC",
+              "达人标签": "中重度游戏",
+              "打折标签": "正常不打折"
+            },
+            "自定义标签": "AutoTest",
+            "备注": "自动化巡检测试数据"
+          },
+          "steps": [
+            {
+              "action": "repeat",
+              "over": "平台账号",
+              "steps": [
+                {
+                  "action": "type",
+                  "label": "粘贴主页链接，自动识别平台",
+                  "value": "${item.链接}",
+                  "nth": "${index}"
+                },
+                {
+                  "action": "recognize",
+                  "label": "粘贴主页链接，自动识别平台",
+                  "nth": "${index}"
+                },
+                {
+                  "action": "click",
+                  "label": "添加平台账号",
+                  "except_last": true
+                }
+              ]
+            },
+            {
+              "action": "repeat",
+              "over": "联系方式",
+              "steps": [
+                {
+                  "action": "type",
+                  "label": "请输入",
+                  "value": "${item.值}",
+                  "nth": "${index}"
+                }
+              ]
+            },
+            {
+              "action": "select",
+              "label": "达人所在地",
+              "value": "${data.其他信息.达人所在地}"
+            },
+            {
+              "action": "select",
+              "label": "达人语言",
+              "value": "${data.其他信息.达人语言}"
+            },
+            {
+              "action": "select",
+              "label": "性别",
+              "value": "${data.其他信息.性别}"
+            },
+            {
+              "action": "select",
+              "label": "受众地区",
+              "value": "${data.其他信息.受众地区}"
+            },
+            {
+              "action": "select",
+              "label": "达人类型",
+              "value": "${data.其他信息.达人类型}"
+            },
+            {
+              "action": "select",
+              "label": "达人标签",
+              "value": "${data.其他信息.达人标签}"
+            },
+            {
+              "action": "select",
+              "label": "打折标签",
+              "value": "${data.其他信息.打折标签}"
+            },
+            {
+              "action": "type",
+              "label": "选填，仅中英文/数字，最长 20 字",
+              "value": "${data.自定义标签}"
+            },
+            {
+              "action": "type",
+              "label": "选填，备注信息",
+              "value": "${data.备注}"
+            },
+            {
+              "action": "click",
+              "label": "保存"
+            }
+          ],
+          "verify": "{{user_name}}",
+          "verify_row": "{{user_name}}"
+        }
+      }
+    }
+  }
+}

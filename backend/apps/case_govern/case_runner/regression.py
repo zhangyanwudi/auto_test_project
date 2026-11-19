@@ -64,6 +64,8 @@ def _run_one(browser, label, chain, op_name, inputs, marker, upload_file_path):
     from .explorer import ExploreError, replay_page, replay_operation, replay_filters
     from .runner import DEFAULT_START_URL, _inject_explore_login
 
+    # 无痕模式（项目约定）：每次新建独立 context，不复用 cookie / localStorage / storage_state。
+    # 不要改成 launch_persistent_context 或传入已保存的登录态。
     context = browser.new_context()
     page = None
     try:
