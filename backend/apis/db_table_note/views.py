@@ -475,7 +475,7 @@ def note_save(request):
 # 执行 SQL 的最大返回行数（防止大结果撑爆内存/响应）
 MAX_QUERY_ROWS = 500
 # 允许执行的查询类语句
-_QUERY_KEYWORDS = ('SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN')
+_QUERY_KEYWORDS = ('SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN', 'WITH')
 # 允许执行的写操作语句
 _WRITE_KEYWORDS = ('UPDATE', 'DELETE', 'INSERT')
 # 需要 WHERE 保护的写操作：删改已有数据时，无 WHERE 会全表生效，必须确认（force=true）
@@ -527,9 +527,15 @@ def sql_execute(request):
             status=400,
         )
 
-    is_write = first_word in _WRITE_KEYWORDS
+    if first_word == 'WITH':
+        # CTE：主体若为 INSERT/UPDATE/DELETE 则按写操作处理，否则为查询
+        is_write = bool(re.search(r'\b(?:INSERT|UPDATE|DELETE)\b', stripped, re.IGNORECASE))
+        needs_where = bool(re.search(r'\b(?:UPDATE|DELETE)\b', stripped, re.IGNORECASE))
+    else:
+        is_write = first_word in _WRITE_KEYWORDS
+        needs_where = first_word in _WHERE_REQUIRED_KEYWORDS
     force = body.get('force') in (True, 'true', '1', 1)
-    if first_word in _WHERE_REQUIRED_KEYWORDS and not _has_where(sql) and not force:
+    if needs_where and not _has_where(sql) and not force:
         return JsonResponse(
             {'code': 400, 'message': '该语句没有 WHERE 条件，将影响全表数据，请确认后再执行'},
             status=400,

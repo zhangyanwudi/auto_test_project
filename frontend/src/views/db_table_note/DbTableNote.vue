@@ -99,11 +99,7 @@
                   >
                     <div class="field-head" @click="toggleFieldOpen(t, row)">
                       <span class="field-name" :title="row.name">{{ row.name }}</span>
-                      <span
-                        class="field-comment"
-                        :class="{ 'is-manual': (row.manual || '').trim() }"
-                        :title="row.manual || row.comment"
-                      >{{ row.manual || row.comment || '无注释' }}</span>
+                      <span class="field-comment" :title="row.manual || row.comment">{{ row.manual || row.comment || '无注释' }}</span>
                       <el-icon class="field-arrow" :class="{ 'is-open': isFieldOpen(t, row) }">
                         <ArrowRight v-if="!isFieldOpen(t, row)" />
                         <ArrowDown v-else />
@@ -1370,12 +1366,6 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* 手动备注在头部用正常色突出显示；数据库注释保持灰色 */
-.field-comment.is-manual {
-  color: var(--el-text-color-regular);
-  font-weight: 500;
 }
 
 .field-arrow {
