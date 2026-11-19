@@ -614,6 +614,10 @@ async function loadTables() {
   tableLoading.value = true
   try {
     const res = await fetchTableList(currentConnId.value, tableKeyword.value)
+    if (res.code !== 0) {
+      // 后端返回的失败原因（如连接失败、驱动缺失）需展示给用户，不能静默清空
+      ElMessage.error(res.message || '获取表列表失败')
+    }
     tables.value = res.code === 0 && Array.isArray(res.data) ? res.data : []
   } catch (e) {
     ElMessage.error(e.message || '获取表列表失败')
