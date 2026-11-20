@@ -154,20 +154,18 @@
               </div>
 
               <p class="panel-label">相关执行 SQL（多条 SQL 用换行分隔，关键字自动高亮）</p>
-              <div class="sql-editor">
-                <pre ref="sqlHighlightRef" class="sql-highlight" aria-hidden="true"><code v-html="highlightedSql"></code></pre>
-                <textarea
-                  ref="sqlTextareaRef"
-                  v-model="noteForm.sqlRecords"
-                  class="sql-textarea"
-                  spellcheck="false"
-                  placeholder="记录这张表相关的执行 SQL，如查询、更新语句等"
-                  @scroll="onSqlScroll"
-                  @paste="onSqlPaste"
-                  @input="onSqlInput"
-                  @blur="onSqlBlur"
-                ></textarea>
-              </div>
+              <div
+                ref="sqlEditorRef"
+                class="sql-editor sql-highlight"
+                contenteditable="plaintext-only"
+                spellcheck="false"
+                data-placeholder="记录这张表相关的执行 SQL，如查询、更新语句等"
+                @input="onSqlInput"
+                @paste="onSqlPaste"
+                @blur="onSqlBlur"
+                @compositionstart="onCompositionStart"
+                @compositionend="onCompositionEnd"
+              ></div>
             </template>
           </div>
         </div>
@@ -306,7 +304,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Setting, Search, ChatLineRound, EditPen, ArrowRight, ArrowDown, CopyDocument } from '@element-plus/icons-vue'
 import {
@@ -870,12 +868,11 @@ const SQL_KEYWORDS = new Set([
   'ASC', 'DESC', 'BETWEEN', 'EXISTS', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX',
 ])
 
-const sqlHighlightRef = ref(null)
-const sqlTextareaRef = ref(null)
+const sqlEditorRef = ref(null)
 
 /** 生成带高亮的 SQL HTML（关键字着色，字符串/数字/注释区分） */
-function buildHighlightedSql() {
-  const raw = noteForm.sqlRecords || ''
+function buildHighlightedSql(text) {
+  const raw = text || ''
   if (!raw) return ''
   // 归一化弯引号为直引号，避免字符串引号不匹配（如 'xxx’）导致 token 无法闭合、后续关键字不高亮
   const normalized = raw.replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
@@ -894,22 +891,18 @@ function buildHighlightedSql() {
   })
 }
 
-const highlightedSql = computed(() => buildHighlightedSql())
+// 末尾补一个空格：textarea 在内容以换行结尾时会多渲染一行，而 <pre> 不会，
+// 导致两层 scrollHeight 相差一行、滚动到底部后选区错位；补空格让两层高度一致
 
 /**
  * SQL 格式化：仅将 SQL 关键字转大写，完全保留原有空白/换行/缩进（不做 trim、折叠、子句重排）。
  * 在粘贴 / 失焦时自动调用，不弹窗确认。
  */
 function formatSqlText() {
-  const ta = sqlTextareaRef.value
   const raw = noteForm.sqlRecords || ''
   if (!raw.trim()) return
 
   // 保存当前选区：格式化会重新赋值导致选区丢失，需在格式化后原样恢复
-  const selStart = ta ? ta.selectionStart : null
-  const selEnd = ta ? ta.selectionEnd : null
-  // 保存滚动位置：重新赋值 value 时 textarea 滚动会归零，需同步恢复
-  const scrollTop = ta ? ta.scrollTop : 0
 
   // 归一化弯引号，保证字符串引号匹配
   const normalized = raw.replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
@@ -978,60 +971,128 @@ function formatSqlText() {
     i += 1
   }
 
-  // 结果与当前值相同时不赋值，避免无意义重渲染导致光标/选区丢失
+  // 结果与当前值相同时不赋值，避免无意义重渲染
   if (result !== raw) {
+    // 文本长度不变（仅关键字大小写/引号变化），选区偏移仍有效，由 watch 重渲染时保留光标
     noteForm.sqlRecords = result
-    // 恢复选区（文本长度不变，仅关键字大小写/引号变化，偏移量仍有效）与滚动位置
-    if (ta && selStart != null) {
-      nextTick(() => {
-        ta.scrollTop = scrollTop
-        ta.setSelectionRange(selStart, selEnd)
-        // 同步高亮层的滚动位置，避免两层文字错位
-        if (sqlHighlightRef.value) {
-          sqlHighlightRef.value.scrollTop = scrollTop
-        }
-      })
-    }
   }
 }
 
-/** 手动接管粘贴：自己替换选中区间（避免默认粘贴与 v-model 竞态导致「追加而非替换」），随后格式化 + 高亮 */
-function onSqlPaste(e) {
-  const ta = sqlTextareaRef.value
-  if (!ta) return
-  e.preventDefault()
-  const text = (e.clipboardData || window.clipboardData).getData('text') || ''
+/* ---- 可编辑高亮编辑区：contenteditable 同时负责输入与高亮，编辑和预览是同一层，选区与滚动天然一致 ---- */
 
-  const start = ta.selectionStart
-  const end = ta.selectionEnd
-  const old = noteForm.sqlRecords || ''
-  const next = old.slice(0, start) + text + old.slice(end)
-  noteForm.sqlRecords = next
-
-  nextTick(() => {
-    ta.focus()
-    const caret = start + text.length
-    ta.setSelectionRange(caret, caret)
-    formatSqlText()
-  })
+/** 读取选区在纯文本中的起止偏移（选区不在编辑区内时视为末尾） */
+function getSqlOffsets(el) {
+  const len = el.textContent.length
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return { start: len, end: len }
+  const range = sel.getRangeAt(0)
+  const measure = (node, offset) => {
+    const r = document.createRange()
+    r.selectNodeContents(el)
+    r.setEnd(node, offset)
+    return r.toString().length
+  }
+  return {
+    start: measure(range.startContainer, range.startOffset),
+    end: measure(range.endContainer, range.endOffset),
+  }
 }
 
-/** 手动输入时仅高亮（v-model 已同步值，不触发格式化） */
+/** 按纯文本偏移设置选区 */
+function setSqlOffsets(el, start, end) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let pos = 0
+  let startNode = null
+  let startOff = 0
+  let endNode = null
+  let endOff = 0
+  let node
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length
+    if (!startNode && start <= pos + len) {
+      startNode = node
+      startOff = start - pos
+    }
+    if (!endNode && end <= pos + len) {
+      endNode = node
+      endOff = end - pos
+      break
+    }
+    pos += len
+  }
+  if (!startNode) {
+    startNode = el
+    startOff = el.childNodes.length
+  }
+  if (!endNode) {
+    endNode = startNode
+    endOff = startOff
+  }
+  const r = document.createRange()
+  r.setStart(startNode, startOff)
+  r.setEnd(endNode, endOff)
+  const sel = window.getSelection()
+  sel.removeAllRanges()
+  sel.addRange(r)
+}
+
+/** 按文本重渲染高亮；编辑区有焦点时保留光标/选区 */
+function renderSqlEditor(text, offsets) {
+  const el = sqlEditorRef.value
+  if (!el) return
+  const focused = document.activeElement === el
+  el.innerHTML = buildHighlightedSql(text)
+  if (focused && offsets) setSqlOffsets(el, offsets.start, offsets.end)
+}
+
+let sqlComposing = false
+function onCompositionStart() {
+  sqlComposing = true
+}
+function onCompositionEnd() {
+  sqlComposing = false
+  onSqlInput()
+}
+
+/** 输入：同步文本并重新高亮，光标保持原位置 */
 function onSqlInput() {
-  // 高亮由 computed(highlightedSql) 自动重算
+  if (sqlComposing) return
+  const el = sqlEditorRef.value
+  if (!el) return
+  const offsets = getSqlOffsets(el)
+  const text = el.textContent
+  noteForm.sqlRecords = text
+  renderSqlEditor(text, offsets)
 }
 
-/** 失焦时兜底格式化一次（手动输入的内容也规整） */
+/** 外部改动（切换表、加载、格式化）时重渲染高亮 */
+watch(() => noteForm.sqlRecords, (v) => {
+  const el = sqlEditorRef.value
+  if (!el || el.textContent === (v || '')) return
+  const focused = document.activeElement === el
+  renderSqlEditor(v || '', focused ? getSqlOffsets(el) : null)
+})
+
+/** 手动接管粘贴：替换选中区间，随后格式化 + 高亮 */
+function onSqlPaste(e) {
+  const el = sqlEditorRef.value
+  if (!el) return
+  e.preventDefault()
+  const pasted = (e.clipboardData || window.clipboardData).getData('text') || ''
+  const { start, end } = getSqlOffsets(el)
+  const old = el.textContent
+  const next = old.slice(0, start) + pasted + old.slice(end)
+  const caret = start + pasted.length
+  noteForm.sqlRecords = next
+  renderSqlEditor(next, { start: caret, end: caret })
+  formatSqlText()
+}
+
+/** 失焦：格式化关键字（高亮保持显示） */
 function onSqlBlur() {
   formatSqlText()
 }
 
-function onSqlScroll(e) {
-  if (sqlHighlightRef.value) {
-    sqlHighlightRef.value.scrollTop = e.target.scrollTop
-    sqlHighlightRef.value.scrollLeft = e.target.scrollLeft
-  }
-}
 
 /** 只保存右侧执行 SQL（不碰 note / field_notes） */
 async function saveSqlRecords() {
@@ -1056,14 +1117,14 @@ async function saveSqlRecords() {
   }
 }
 
-/** 从 textarea 取「选中的 SQL」，无选中则返回整段内容 */
+/** 取编辑区「选中的 SQL」，无选中则返回整段内容 */
 function getSelectedSql() {
-  const ta = sqlTextareaRef.value
-  if (!ta) return (noteForm.sqlRecords || '').trim()
-  const s = ta.selectionStart
-  const e = ta.selectionEnd
-  if (s === e) return (noteForm.sqlRecords || '').trim()
-  return (noteForm.sqlRecords || '').slice(s, e).trim()
+  const el = sqlEditorRef.value
+  const full = noteForm.sqlRecords || ''
+  if (!el) return full.trim()
+  const { start, end } = getSqlOffsets(el)
+  if (start === end) return full.trim()
+  return full.slice(start, end).trim()
 }
 
 /** 判断 SQL 是否为「无 WHERE 的删改操作」（UPDATE/DELETE，需二次确认） */
@@ -1444,61 +1505,52 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+/* 单层可编辑高亮：编辑区自身滚动，编辑与高亮同层，失焦/输入不切换、不丢滚动位置 */
 .sql-editor {
-  position: relative;
-  flex: 1;
-  min-height: 420px;
+  height: 560px;
+  padding: 10px 12px 40px;
+  box-sizing: border-box;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   background: #fff;
-  overflow: hidden;
-}
-
-.sql-editor:focus-within {
-  border-color: var(--el-color-primary);
-}
-
-.sql-highlight,
-.sql-textarea {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 10px 12px;
-  box-sizing: border-box;
+  overflow: auto;
   font-family: 'SF Mono', 'JetBrains Mono', Consolas, Menlo, monospace;
   font-size: 13px;
   line-height: 1.7;
   white-space: pre-wrap;
-  /* 用 overflow-wrap: break-word 而非 break-all：
-     break-all 会在任意字符处断行，导致透明 textarea 与高亮 pre 层换行位置不一致，
-     长 SQL 后半段文字错位、无法正确选中（如 m ON m.id = r.id; 这一块） */
   overflow-wrap: break-word;
   word-break: normal;
-  overflow: auto;
   tab-size: 4;
-}
-
-.sql-highlight {
   color: var(--el-text-color-primary);
-  pointer-events: none;
-}
-
-.sql-highlight code {
-  font-family: inherit;
-  font-size: inherit;
-}
-
-.sql-textarea {
-  border: none;
-  outline: none;
-  resize: none;
-  background: transparent;
-  color: transparent;
   caret-color: #000;
-  -webkit-text-fill-color: transparent;
+  outline: none;
+}
+
+.sql-editor:focus {
+  border-color: var(--el-color-primary);
+}
+
+.sql-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--el-text-color-placeholder);
+}
+
+.sql-editor :deep(.sql-kw) {
+  color: #d63384;
+  font-weight: 600;
+}
+
+.sql-editor :deep(.sql-str) {
+  color: #0a3069;
+}
+
+.sql-editor :deep(.sql-num) {
+  color: #953800;
+}
+
+.sql-editor :deep(.sql-cmt) {
+  color: #6e7781;
+  font-style: italic;
 }
 
 .sql-highlight :deep(.sql-kw) {
